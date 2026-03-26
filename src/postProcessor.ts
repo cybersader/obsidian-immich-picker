@@ -18,9 +18,9 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
   plugin.registerMarkdownPostProcessor(async (el: HTMLElement) => {
     const images = el.querySelectorAll('img')
     for (const img of Array.from(images)) {
-      const src = img.getAttribute('src') || ''
-      // Match immich://ASSET_ID (UUID format)
-      const match = src.match(/immich:\/\/([a-f0-9-]+)/i)
+      const alt = img.getAttribute('alt') || ''
+      // Match immich:ASSET_ID in alt text (UUID format)
+      const match = alt.match(/^immich:([a-f0-9-]+)$/i)
       if (!match) continue
 
       const assetId = match[1]
@@ -28,6 +28,7 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
       try {
         const blobUrl = await fetchOrGetCached(plugin, assetId)
         img.src = blobUrl
+        img.alt = ''
       } catch (e) {
         console.error(`Failed to load Immich thumbnail for ${assetId}:`, e)
         img.alt = `[Immich image unavailable: ${assetId}]`
@@ -50,9 +51,10 @@ async function fetchOrGetCached (plugin: ImmichPicker, assetId: string): Promise
   // Fetch and cache
   const fetchPromise = (async () => {
     const url = plugin.immichApi.getThumbnailUrl(assetId)
+    const apiKey = await plugin.getApiKey()
     const response = await requestUrl({
       url,
-      headers: { 'x-api-key': plugin.settings.apiKey }
+      headers: { 'x-api-key': apiKey }
     })
     const blob = new Blob([response.arrayBuffer], { type: 'image/jpeg' })
     const blobUrl = URL.createObjectURL(blob)

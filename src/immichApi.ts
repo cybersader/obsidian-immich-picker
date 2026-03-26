@@ -50,7 +50,7 @@ export class ImmichApi {
   }
 
   private get apiKey (): string {
-    return this.plugin.settings.apiKey
+    return this.plugin.cachedApiKey || this.plugin.settings.apiKey
   }
 
   private getHeaders (): Record<string, string> {

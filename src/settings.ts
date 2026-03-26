@@ -82,17 +82,29 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings()
         }))
 
-    new Setting(containerEl)
+    const apiKeySetting = new Setting(containerEl)
       .setName('API key')
-      .addText(text => text
+
+    // Load API key asynchronously and populate input
+    void (async () => {
+      const currentKey = await this.plugin.getApiKey()
+      apiKeySetting.addText(text => text
         .setPlaceholder('Enter your API key')
-        .setValue(this.plugin.settings.apiKey)
+        .setValue(currentKey)
         .onChange(async value => {
-          this.plugin.settings.apiKey = value.trim()
-          await this.plugin.saveSettings()
+          await this.plugin.setApiKey(value.trim())
         }))
-      .then(setting => {
+      apiKeySetting.then(setting => {
         setting.descEl.appendText('Generate in Immich under Account Settings > API Keys.')
+        setting.descEl.createEl('br')
+        if (this.plugin.hasSecretStorage()) {
+          setting.descEl.createEl('span', {
+            text: '🔒 Stored securely via OS credential manager.',
+            cls: 'mod-success'
+          })
+        } else {
+          setting.descEl.appendText('Stored in plugin data file.')
+        }
         setting.descEl.createEl('br')
         setting.descEl.appendText('Required permissions: ')
         setting.descEl.createEl('code', { text: 'asset.read' })
@@ -102,6 +114,7 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
         setting.descEl.appendText('Optional for albums: ')
         setting.descEl.createEl('code', { text: 'album.read' })
       })
+    })()
 
     new Setting(containerEl)
       .setDesc('Test your connection to the Immich server.')

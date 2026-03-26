@@ -5,25 +5,32 @@ import { ImmichPickerModal } from './photoModal'
 import { handlebarParse } from './handlebars'
 import { registerImmichPostProcessor, clearImmichBlobCache } from './postProcessor'
 
+// 1x1 transparent GIF — CSP-compliant placeholder for remote mode
+const PLACEHOLDER_GIF = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+
 export default class ImmichPicker extends Plugin {
   settings: ImmichPickerSettings
   immichApi: ImmichApi
+  cachedApiKey = ''
 
   async onload () {
     await this.loadSettings()
 
     this.immichApi = new ImmichApi(this)
 
+    // Cache API key (migrate from data.json to secretStorage if available)
+    await this.initApiKey()
+
     this.addSettingTab(new ImmichPickerSettingTab(this.app, this))
 
-    // Always register post-processor so immich:// URLs render in any mode
+    // Always register post-processor so remote images render in any mode
     registerImmichPostProcessor(this)
 
     this.addCommand({
       id: 'insert-immich-photo',
       name: 'Insert image from Immich',
       editorCallback: (editor: Editor, view: MarkdownView) => {
-        if (!this.settings.serverUrl || !this.settings.apiKey) {
+        if (!this.settings.serverUrl || !this.cachedApiKey) {
           new Notice('Please configure Immich server URL and API key in settings')
           return
         }
@@ -35,7 +42,7 @@ export default class ImmichPicker extends Plugin {
       id: 'convert-remote-to-local',
       name: 'Convert remote images to local thumbnails',
       editorCallback: async (editor: Editor, view: MarkdownView) => {
-        if (!this.settings.serverUrl || !this.settings.apiKey) {
+        if (!this.settings.serverUrl || !this.cachedApiKey) {
           new Notice('Please configure Immich server URL and API key in settings')
           return
         }
@@ -47,7 +54,7 @@ export default class ImmichPicker extends Plugin {
     this.registerEvent(
       this.app.workspace.on('editor-paste', async (evt: ClipboardEvent, editor: Editor, view: MarkdownView) => {
         if (!this.settings.convertPastedLink) return
-        if (!this.settings.serverUrl || !this.settings.apiKey) return
+        if (!this.settings.serverUrl || !this.cachedApiKey) return
 
         const clipboardText = evt.clipboardData?.getData('text/plain')
         if (!clipboardText) return
@@ -71,12 +78,7 @@ export default class ImmichPicker extends Plugin {
           let linkText: string
 
           if (this.settings.imageMode === 'remote') {
-            linkText = this.generateRemoteMarkdown({
-              assetId,
-              originalFilename: '',
-              takenDate: moment().format(),
-              description: ''
-            })
+            linkText = this.generateRemoteMarkdown(assetId)
           } else if (this.settings.imageMode === 'shared') {
             linkText = await this.generateSharedMarkdown({
               assetId,
@@ -122,9 +124,69 @@ export default class ImmichPicker extends Plugin {
     clearImmichBlobCache()
   }
 
-  /**
-   * Computes thumbnail folder and link paths based on settings
-   */
+  // --- SecretStorage ---
+
+  hasSecretStorage (): boolean {
+    return 'secretStorage' in this.app && (this.app as any).secretStorage != null
+  }
+
+  async getApiKey (): Promise<string> {
+    if (this.cachedApiKey) return this.cachedApiKey
+
+    if (this.hasSecretStorage()) {
+      try {
+        const secret = await (this.app as any).secretStorage.getSecret('immich-api-key')
+        if (secret) {
+          this.cachedApiKey = secret
+          return secret
+        }
+      } catch {
+        // Fall through to settings
+      }
+    }
+
+    this.cachedApiKey = this.settings.apiKey
+    return this.cachedApiKey
+  }
+
+  async setApiKey (apiKey: string): Promise<void> {
+    this.cachedApiKey = apiKey
+
+    if (this.hasSecretStorage()) {
+      try {
+        await (this.app as any).secretStorage.saveSecret('immich-api-key', apiKey)
+        // Clear from plain-text settings
+        this.settings.apiKey = ''
+        await this.saveSettings()
+        return
+      } catch {
+        // Fall through to settings
+      }
+    }
+
+    this.settings.apiKey = apiKey
+    await this.saveSettings()
+  }
+
+  private async initApiKey (): Promise<void> {
+    // Migrate from data.json to secretStorage if available
+    if (this.hasSecretStorage() && this.settings.apiKey) {
+      try {
+        await (this.app as any).secretStorage.saveSecret('immich-api-key', this.settings.apiKey)
+        this.cachedApiKey = this.settings.apiKey
+        this.settings.apiKey = ''
+        await this.saveSettings()
+        return
+      } catch {
+        // Fall through
+      }
+    }
+
+    await this.getApiKey()
+  }
+
+  // --- Path computation ---
+
   computeThumbnailPaths (noteFolder: string, filename: string): { thumbnailFolder: string, linkPath: string, savePath: string } {
     let thumbnailFolder = noteFolder
     let linkPath = filename
@@ -147,26 +209,19 @@ export default class ImmichPicker extends Plugin {
     return { thumbnailFolder, linkPath, savePath }
   }
 
-  /**
-   * Creates folder if it doesn't exist
-   */
   async ensureFolderExists (folderPath: string): Promise<void> {
     if (folderPath && !await this.app.vault.adapter.exists(folderPath)) {
       await this.app.vault.createFolder(folderPath)
     }
   }
 
-  /**
-   * Downloads thumbnail from Immich and saves to vault
-   */
   async saveThumbnailToVault (assetId: string, savePath: string): Promise<void> {
     const imageData = await this.immichApi.downloadThumbnail(assetId)
     await this.app.vault.adapter.writeBinary(savePath, imageData)
   }
 
-  /**
-   * Generates markdown text for inserted thumbnail (local mode)
-   */
+  // --- Markdown generation ---
+
   generateThumbnailMarkdown (params: {
     linkPath: string,
     assetId: string,
@@ -186,28 +241,14 @@ export default class ImmichPicker extends Plugin {
   }
 
   /**
-   * Generates markdown for remote mode (immich:// protocol, no file download)
+   * Remote mode: fixed format with data URI placeholder + alt text marker.
+   * Does NOT use the user's template — the post-processor needs a predictable format.
    */
-  generateRemoteMarkdown (params: {
-    assetId: string,
-    originalFilename: string,
-    takenDate: string,
-    description: string
-  }): string {
-    return handlebarParse(this.settings.thumbnailMarkdown, {
-      local_thumbnail_link: `immich://${params.assetId}`,
-      immich_thumbnail_url: this.immichApi.getThumbnailUrl(params.assetId),
-      immich_asset_id: params.assetId,
-      immich_url: this.immichApi.getAssetUrl(params.assetId),
-      original_filename: params.originalFilename,
-      taken_date: params.takenDate,
-      description: params.description
-    })
+  generateRemoteMarkdown (assetId: string): string {
+    const immichUrl = this.immichApi.getAssetUrl(assetId)
+    return `[![immich:${assetId}](${PLACEHOLDER_GIF})](${immichUrl}) `
   }
 
-  /**
-   * Generates markdown for shared mode (creates shared link, uses public URL)
-   */
   async generateSharedMarkdown (params: {
     assetId: string,
     originalFilename: string,
@@ -228,9 +269,8 @@ export default class ImmichPicker extends Plugin {
     })
   }
 
-  /**
-   * Converts immich:// remote references in the current note to local thumbnails
-   */
+  // --- Convert remote to local ---
+
   async convertRemoteToLocal (editor: Editor, view: MarkdownView): Promise<void> {
     const noteFile = view.file
     if (!noteFile) {
@@ -239,7 +279,8 @@ export default class ImmichPicker extends Plugin {
     }
 
     const content = editor.getValue()
-    const pattern = /immich:\/\/([a-f0-9-]+)/gi
+    // Match: ![immich:UUID](data:image/gif;base64,...)
+    const pattern = /!\[immich:([a-f0-9-]+)\]\(data:image\/gif;base64,[A-Za-z0-9+/=]+\)/gi
     const matches = [...content.matchAll(pattern)]
 
     if (matches.length === 0) {
@@ -256,6 +297,7 @@ export default class ImmichPicker extends Plugin {
       for (let i = 0; i < matches.length; i++) {
         const match = matches[i]
         const assetId = match[1]
+        const fullMatch = match[0]
         loadingNotice.setMessage(`Converting image ${i + 1}/${matches.length}...`)
 
         const creationTime = moment()
@@ -264,8 +306,8 @@ export default class ImmichPicker extends Plugin {
         await this.ensureFolderExists(thumbnailFolder)
         await this.saveThumbnailToVault(assetId, savePath)
 
-        // Replace this specific immich:// reference with the local path
-        updatedContent = updatedContent.replace(`immich://${assetId}`, linkPath)
+        // Replace the remote image markdown with local path
+        updatedContent = updatedContent.replace(fullMatch, `![](${linkPath})`)
       }
 
       editor.setValue(updatedContent)
