@@ -514,15 +514,19 @@ export class ImmichPickerModal extends Modal {
       return
     }
 
+    const isLocal = this.plugin.settings.imageMode === 'local'
     const loadingNotice = new Notice(`Inserting ${this.currentAlbumAssets.length} photos...`, 0)
 
     try {
       const noteFolder = noteFile.path.split('/').slice(0, -1).join('/')
-      // Ensure folder exists once before the loop
-      const firstAsset = this.currentAlbumAssets[0]
-      const firstFilename = window.moment(firstAsset.fileCreatedAt).format(this.plugin.settings.filename)
-      const { thumbnailFolder } = this.plugin.computeThumbnailPaths(noteFolder, firstFilename)
-      await this.plugin.ensureFolderExists(thumbnailFolder)
+
+      // Only set up folders for local mode
+      if (isLocal) {
+        const firstAsset = this.currentAlbumAssets[0]
+        const firstFilename = window.moment(firstAsset.fileCreatedAt).format(this.plugin.settings.filename)
+        const { thumbnailFolder } = this.plugin.computeThumbnailPaths(noteFolder, firstFilename)
+        await this.plugin.ensureFolderExists(thumbnailFolder)
+      }
 
       let insertedText = ''
 
@@ -531,22 +535,41 @@ export class ImmichPickerModal extends Modal {
         loadingNotice.setMessage(`Inserting photo ${i + 1}/${this.currentAlbumAssets.length}...`)
 
         const creationTime = window.moment(asset.fileCreatedAt)
-        const filename = creationTime.format(this.plugin.settings.filename)
-        const { linkPath, savePath } = this.plugin.computeThumbnailPaths(noteFolder, filename)
-
-        await this.plugin.saveThumbnailToVault(asset.id, savePath)
 
         // Get description
         const assetDetails = await this.plugin.immichApi.getAssetDetails(asset.id)
         const description = assetDetails.exifInfo?.description || ''
 
-        const linkText = this.plugin.generateThumbnailMarkdown({
-          linkPath,
-          assetId: asset.id,
-          originalFilename: asset.originalFileName,
-          takenDate: creationTime.format(),
-          description
-        })
+        let linkText: string
+
+        if (this.plugin.settings.imageMode === 'remote') {
+          linkText = this.plugin.generateRemoteMarkdown({
+            assetId: asset.id,
+            originalFilename: asset.originalFileName,
+            takenDate: creationTime.format(),
+            description
+          })
+        } else if (this.plugin.settings.imageMode === 'shared') {
+          linkText = await this.plugin.generateSharedMarkdown({
+            assetId: asset.id,
+            originalFilename: asset.originalFileName,
+            takenDate: creationTime.format(),
+            description
+          })
+        } else {
+          const filename = creationTime.format(this.plugin.settings.filename)
+          const { linkPath, savePath } = this.plugin.computeThumbnailPaths(noteFolder, filename)
+
+          await this.plugin.saveThumbnailToVault(asset.id, savePath)
+
+          linkText = this.plugin.generateThumbnailMarkdown({
+            linkPath,
+            assetId: asset.id,
+            originalFilename: asset.originalFileName,
+            takenDate: creationTime.format(),
+            description
+          })
+        }
 
         insertedText += linkText
       }
@@ -578,29 +601,47 @@ export class ImmichPickerModal extends Modal {
         return
       }
 
-      const noteFolder = noteFile.path.split('/').slice(0, -1).join('/')
-      const { thumbnailFolder, linkPath, savePath } = this.plugin.computeThumbnailPaths(noteFolder, thumbnailImage.filename)
-      await this.plugin.ensureFolderExists(thumbnailFolder)
-      await this.plugin.saveThumbnailToVault(thumbnailImage.assetId, savePath)
-
       // Fetch asset details to get description
       const assetDetails = await this.plugin.immichApi.getAssetDetails(thumbnailImage.assetId)
       const description = assetDetails.exifInfo?.description || ''
 
-      const linkText = this.plugin.generateThumbnailMarkdown({
-        linkPath,
-        assetId: thumbnailImage.assetId,
-        originalFilename: thumbnailImage.originalFilename,
-        takenDate: thumbnailImage.creationTime.format(),
-        description
-      })
+      let linkText: string
+
+      if (this.plugin.settings.imageMode === 'remote') {
+        linkText = this.plugin.generateRemoteMarkdown({
+          assetId: thumbnailImage.assetId,
+          originalFilename: thumbnailImage.originalFilename,
+          takenDate: thumbnailImage.creationTime.format(),
+          description
+        })
+      } else if (this.plugin.settings.imageMode === 'shared') {
+        linkText = await this.plugin.generateSharedMarkdown({
+          assetId: thumbnailImage.assetId,
+          originalFilename: thumbnailImage.originalFilename,
+          takenDate: thumbnailImage.creationTime.format(),
+          description
+        })
+      } else {
+        const noteFolder = noteFile.path.split('/').slice(0, -1).join('/')
+        const { thumbnailFolder, linkPath, savePath } = this.plugin.computeThumbnailPaths(noteFolder, thumbnailImage.filename)
+        await this.plugin.ensureFolderExists(thumbnailFolder)
+        await this.plugin.saveThumbnailToVault(thumbnailImage.assetId, savePath)
+
+        linkText = this.plugin.generateThumbnailMarkdown({
+          linkPath,
+          assetId: thumbnailImage.assetId,
+          originalFilename: thumbnailImage.originalFilename,
+          takenDate: thumbnailImage.creationTime.format(),
+          description
+        })
+      }
 
       const cursorPosition = this.editor.getCursor()
       this.editor.replaceRange(linkText, cursorPosition)
       this.editor.setCursor({ line: cursorPosition.line, ch: cursorPosition.ch + linkText.length })
     } catch (e) {
       console.error('Failed to insert image:', e)
-      new Notice('Failed to download thumbnail: ' + (e as Error).message)
+      new Notice('Failed to insert image: ' + (e as Error).message)
     }
     this.close()
   }

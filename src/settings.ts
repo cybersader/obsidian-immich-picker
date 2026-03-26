@@ -4,11 +4,14 @@ import ImmichPicker from './main'
 
 export type GetDateFromOption = 'none' | 'title' | 'frontmatter';
 
+export type ImageModeOption = 'local' | 'remote' | 'shared';
+
 export interface ImmichPickerSettings {
   serverUrl: string;
   apiKey: string;
   recentPhotosCount: number;
   gridColumns: number;
+  imageMode: ImageModeOption;
   thumbnailWidth: number;
   thumbnailHeight: number;
   filename: string;
@@ -27,6 +30,7 @@ export const DEFAULT_SETTINGS: ImmichPickerSettings = {
   apiKey: '',
   recentPhotosCount: 9,
   gridColumns: 3,
+  imageMode: 'local',
   thumbnailWidth: 400,
   thumbnailHeight: 280,
   filename: '[immich_]YYYY-MM-DD--HH-mm-ss[.jpg]',
@@ -154,6 +158,37 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
         }))
 
     /*
+     Image mode settings
+     */
+
+    new Setting(containerEl)
+      .setName('Image mode')
+      .setHeading()
+
+    new Setting(containerEl)
+      .setName('How to store images')
+      .addDropdown(dropdown => {
+        dropdown
+          .addOption('local', 'Download to vault')
+          .addOption('remote', 'Load from Immich server')
+          .addOption('shared', 'Use Immich shared links')
+          .setValue(this.plugin.settings.imageMode)
+          .onChange(async value => {
+            this.plugin.settings.imageMode = value as 'local' | 'remote' | 'shared'
+            await this.plugin.saveSettings()
+            // Re-render to show/hide dependent sections
+            this.display()
+          })
+      })
+      .then(setting => {
+        setting.descEl.appendText('Local: downloads thumbnail files into your vault. ')
+        setting.descEl.createEl('br')
+        setting.descEl.appendText('Remote: images are fetched live from Immich when rendering (no files saved, requires plugin). ')
+        setting.descEl.createEl('br')
+        setting.descEl.appendText('Shared: creates public Immich shared links (works without plugin, but URLs are public).')
+      })
+
+    /*
      Date detection settings
      */
 
@@ -212,118 +247,121 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
         setVisible(dateFromFormatEl, this.plugin.settings.getDateFrom !== 'none')
       })
 
-    /*
-     Thumbnail settings
-     */
+    // Only show thumbnail and storage settings in local mode
+    if (this.plugin.settings.imageMode === 'local') {
+      /*
+       Thumbnail settings
+       */
 
-    new Setting(containerEl)
-      .setName('Thumbnails')
-      .setHeading()
-      .setDesc('Configure the locally-saved thumbnail images.')
+      new Setting(containerEl)
+        .setName('Thumbnails')
+        .setHeading()
+        .setDesc('Configure the locally-saved thumbnail images.')
 
-    new Setting(containerEl)
-      .setName('Thumbnail width')
-      .setDesc('Maximum width of the locally-saved thumbnail image in pixels')
-      .addText(text => text
-        .setPlaceholder(DEFAULT_SETTINGS.thumbnailWidth.toString())
-        .setValue(this.plugin.settings.thumbnailWidth.toString())
-        .onChange(async value => {
-          this.plugin.settings.thumbnailWidth = +value
-          await this.plugin.saveSettings()
-        }))
+      new Setting(containerEl)
+        .setName('Thumbnail width')
+        .setDesc('Maximum width of the locally-saved thumbnail image in pixels')
+        .addText(text => text
+          .setPlaceholder(DEFAULT_SETTINGS.thumbnailWidth.toString())
+          .setValue(this.plugin.settings.thumbnailWidth.toString())
+          .onChange(async value => {
+            this.plugin.settings.thumbnailWidth = +value
+            await this.plugin.saveSettings()
+          }))
 
-    new Setting(containerEl)
-      .setName('Thumbnail height')
-      .setDesc('Maximum height of the locally-saved thumbnail image in pixels')
-      .addText(text => text
-        .setPlaceholder(DEFAULT_SETTINGS.thumbnailHeight.toString())
-        .setValue(this.plugin.settings.thumbnailHeight.toString())
-        .onChange(async value => {
-          this.plugin.settings.thumbnailHeight = +value
-          await this.plugin.saveSettings()
-        }))
+      new Setting(containerEl)
+        .setName('Thumbnail height')
+        .setDesc('Maximum height of the locally-saved thumbnail image in pixels')
+        .addText(text => text
+          .setPlaceholder(DEFAULT_SETTINGS.thumbnailHeight.toString())
+          .setValue(this.plugin.settings.thumbnailHeight.toString())
+          .onChange(async value => {
+            this.plugin.settings.thumbnailHeight = +value
+            await this.plugin.saveSettings()
+          }))
 
-    let filenamePreviewEl: HTMLElement
+      let filenamePreviewEl: HTMLElement
 
-    new Setting(containerEl)
-      .setName('Image filename format')
-      .addText(text => text
-        .setPlaceholder(DEFAULT_SETTINGS.filename)
-        .setValue(this.plugin.settings.filename)
-        .onChange(async value => {
-          this.plugin.settings.filename = value.trim()
-          await this.plugin.saveSettings()
-          this.updateFilenamePreview(filenamePreviewEl, value.trim())
-        }))
-      .then(setting => {
-        setting.descEl.appendText('Filename format for saving thumbnails (')
-        setting.descEl.createEl('a', {
-          text: 'Moment.js format',
-          href: 'https://momentjs.com/docs/#/displaying/format/'
+      new Setting(containerEl)
+        .setName('Image filename format')
+        .addText(text => text
+          .setPlaceholder(DEFAULT_SETTINGS.filename)
+          .setValue(this.plugin.settings.filename)
+          .onChange(async value => {
+            this.plugin.settings.filename = value.trim()
+            await this.plugin.saveSettings()
+            this.updateFilenamePreview(filenamePreviewEl, value.trim())
+          }))
+        .then(setting => {
+          setting.descEl.appendText('Filename format for saving thumbnails (')
+          setting.descEl.createEl('a', {
+            text: 'Moment.js format',
+            href: 'https://momentjs.com/docs/#/displaying/format/'
+          })
+          setting.descEl.appendText(').')
+          setting.descEl.createEl('br')
+          setting.descEl.createEl('br')
+          setting.descEl.appendText('Preview: ')
+          filenamePreviewEl = setting.descEl.createEl('code', { cls: 'immich-filename-preview' })
+          this.updateFilenamePreview(filenamePreviewEl, this.plugin.settings.filename)
         })
-        setting.descEl.appendText(').')
-        setting.descEl.createEl('br')
-        setting.descEl.createEl('br')
-        setting.descEl.appendText('Preview: ')
-        filenamePreviewEl = setting.descEl.createEl('code', { cls: 'immich-filename-preview' })
-        this.updateFilenamePreview(filenamePreviewEl, this.plugin.settings.filename)
-      })
 
-    /*
-     Storage location settings
-     */
+      /*
+       Storage location settings
+       */
 
-    new Setting(containerEl)
-      .setName('Storage location')
-      .setHeading()
+      new Setting(containerEl)
+        .setName('Storage location')
+        .setHeading()
 
-    const locationOptionEl = new Setting(this.containerEl)
-    const locationFolderEl = new Setting(this.containerEl)
-      .setName('Thumbnail image folder')
-      .setDesc('Thumbnails will be saved to this folder')
-      .addSearch(search => {
-        new FolderSuggest(this.app, search.inputEl)
-        search.setPlaceholder('Path/for/thumbnails')
-          .setValue(this.plugin.settings.locationFolder)
-          .onChange(async value => {
-            this.plugin.settings.locationFolder = value.trim()
-            await this.plugin.saveSettings()
-          })
-      })
+      const locationOptionEl = new Setting(this.containerEl)
+      const locationFolderEl = new Setting(this.containerEl)
+        .setName('Thumbnail image folder')
+        .setDesc('Thumbnails will be saved to this folder')
+        .addSearch(search => {
+          new FolderSuggest(this.app, search.inputEl)
+          search.setPlaceholder('Path/for/thumbnails')
+            .setValue(this.plugin.settings.locationFolder)
+            .onChange(async value => {
+              this.plugin.settings.locationFolder = value.trim()
+              await this.plugin.saveSettings()
+            })
+        })
 
-    const locationSubfolderEl = new Setting(this.containerEl)
-      .setName('Subfolder name')
-      .setDesc('Subfolder within the current note\'s folder')
-      .addText(text => {
-        text
-          .setPlaceholder('Photos')
-          .setValue(this.plugin.settings.locationSubfolder)
-          .onChange(async value => {
-            this.plugin.settings.locationSubfolder = value.trim().replace(/^[\\/]+/, '').replace(/[\\/]+$/, '')
-            await this.plugin.saveSettings()
-          })
-      })
+      const locationSubfolderEl = new Setting(this.containerEl)
+        .setName('Subfolder name')
+        .setDesc('Subfolder within the current note\'s folder')
+        .addText(text => {
+          text
+            .setPlaceholder('Photos')
+            .setValue(this.plugin.settings.locationSubfolder)
+            .onChange(async value => {
+              this.plugin.settings.locationSubfolder = value.trim().replace(/^[\\/]+/, '').replace(/[\\/]+$/, '')
+              await this.plugin.saveSettings()
+            })
+        })
 
-    locationOptionEl
-      .setName('Location to save thumbnails')
-      .setDesc('Where the local thumbnail images will be saved')
-      .addDropdown(dropdown => {
-        dropdown
-          .addOption('note', 'Same folder as the note')
-          .addOption('subfolder', 'In a subfolder of the current note')
-          .addOption('specified', 'In a specific folder')
-          .setValue(this.plugin.settings.locationOption)
-          .onChange(async value => {
-            setVisible(locationFolderEl, value === 'specified')
-            setVisible(locationSubfolderEl, value === 'subfolder')
-            this.plugin.settings.locationOption = value
-            await this.plugin.saveSettings()
-          })
-      })
-      .then(() => {
-        setVisible(locationFolderEl, this.plugin.settings.locationOption === 'specified')
-        setVisible(locationSubfolderEl, this.plugin.settings.locationOption === 'subfolder')
-      })
+      locationOptionEl
+        .setName('Location to save thumbnails')
+        .setDesc('Where the local thumbnail images will be saved')
+        .addDropdown(dropdown => {
+          dropdown
+            .addOption('note', 'Same folder as the note')
+            .addOption('subfolder', 'In a subfolder of the current note')
+            .addOption('specified', 'In a specific folder')
+            .setValue(this.plugin.settings.locationOption)
+            .onChange(async value => {
+              setVisible(locationFolderEl, value === 'specified')
+              setVisible(locationSubfolderEl, value === 'subfolder')
+              this.plugin.settings.locationOption = value
+              await this.plugin.saveSettings()
+            })
+        })
+        .then(() => {
+          setVisible(locationFolderEl, this.plugin.settings.locationOption === 'specified')
+          setVisible(locationSubfolderEl, this.plugin.settings.locationOption === 'subfolder')
+        })
+    }
 
     /*
      Output settings
@@ -345,7 +383,8 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
         }))
       .then(setting => {
         const ul = setting.descEl.createEl('ul')
-        ul.createEl('li').setText('local_thumbnail_link - path to the local thumbnail')
+        ul.createEl('li').setText('local_thumbnail_link - path to local thumbnail (or immich:// link in remote mode)')
+        ul.createEl('li').setText('immich_thumbnail_url - direct thumbnail link from the server')
         ul.createEl('li').setText('immich_url - URL to the photo in Immich')
         ul.createEl('li').setText('immich_asset_id - the Immich asset ID')
         ul.createEl('li').setText('original_filename - original filename from Immich')

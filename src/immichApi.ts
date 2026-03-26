@@ -31,6 +31,13 @@ export interface ImmichAlbum {
   updatedAt: string;
 }
 
+export interface ImmichSharedLink {
+  id: string;
+  key: string;
+  type: string;
+  assets: ImmichAsset[];
+}
+
 export class ImmichApi {
   plugin: ImmichPicker
 
@@ -204,6 +211,28 @@ export class ImmichApi {
 
     const album = response.json as { assets: ImmichAsset[] }
     return album.assets || []
+  }
+
+  async createSharedLink (assetId: string): Promise<ImmichSharedLink> {
+    const response = await requestUrl({
+      url: `${this.serverUrl}/api/shared-links`,
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        type: 'INDIVIDUAL',
+        assetIds: [assetId]
+      })
+    })
+
+    if (response.status !== 200 && response.status !== 201) {
+      throw new Error(`Failed to create shared link: ${response.status}`)
+    }
+
+    return response.json as ImmichSharedLink
+  }
+
+  getSharedThumbnailUrl (assetId: string, shareKey: string): string {
+    return `${this.serverUrl}/api/assets/${assetId}/thumbnail?size=preview&key=${shareKey}`
   }
 
   extractAssetIdFromUrl (url: string): string | null {
