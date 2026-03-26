@@ -397,7 +397,7 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
       .then(setting => {
         const ul = setting.descEl.createEl('ul')
         ul.createEl('li').setText('local_thumbnail_link - path to local thumbnail (or immich:// link in remote mode)')
-        ul.createEl('li').setText('immich_thumbnail_url - thumbnail link from the server')
+        ul.createEl('li').setText('immich_thumbnail_url - server thumbnail link')
         ul.createEl('li').setText('immich_url - URL to the photo in Immich')
         ul.createEl('li').setText('immich_asset_id - the Immich asset ID')
         ul.createEl('li').setText('original_filename - original filename from Immich')
