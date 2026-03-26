@@ -4,6 +4,7 @@ import { ImmichPickerSettingTab, ImmichPickerSettings, DEFAULT_SETTINGS } from '
 import { ImmichPickerModal } from './photoModal'
 import { handlebarParse } from './handlebars'
 import { registerImmichPostProcessor, clearImmichBlobCache } from './postProcessor'
+import { ConversionModal } from './conversionModal'
 
 // No placeholder needed — remote mode uses code block syntax rendered by code block processor
 
@@ -47,8 +48,20 @@ export default class ImmichPicker extends Plugin {
     })
 
     this.addCommand({
+      id: 'convert-immich-images',
+      name: 'Convert Immich images',
+      callback: () => {
+        if (!this.settings.serverUrl) {
+          new Notice('Please configure Immich server URL in settings')
+          return
+        }
+        new ConversionModal(this.app, this).open()
+      }
+    })
+
+    this.addCommand({
       id: 'convert-remote-format',
-      name: 'Convert remote images to current format',
+      name: 'Convert remote images to current format (current note)',
       editorCallback: async (editor: Editor, view: MarkdownView) => {
         if (!this.settings.serverUrl) {
           new Notice('Please configure Immich server URL in settings')
@@ -60,7 +73,7 @@ export default class ImmichPicker extends Plugin {
 
     this.addCommand({
       id: 'convert-remote-to-local',
-      name: 'Convert remote images to local thumbnails',
+      name: 'Convert remote images to local thumbnails (current note)',
       editorCallback: async (editor: Editor, view: MarkdownView) => {
         if (!this.settings.serverUrl || !this.cachedApiKey) {
           new Notice('Please configure Immich server URL and API key in settings')
@@ -304,7 +317,7 @@ export default class ImmichPicker extends Plugin {
   /**
    * Finds all remote Immich image references (any format) and returns matches with asset IDs.
    */
-  private findRemoteReferences (content: string): { fullMatch: string, assetId: string }[] {
+  findRemoteReferences (content: string): { fullMatch: string, assetId: string }[] {
     const serverUrlEscaped = this.settings.serverUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const patterns = [
       /```immich\n([a-f0-9-]+)\n```/gi,
