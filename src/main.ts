@@ -8,6 +8,15 @@ import { registerImmichPostProcessor, clearImmichBlobCache } from './postProcess
 // 1x1 transparent GIF — CSP-compliant placeholder for remote mode
 const PLACEHOLDER_GIF = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
 
+// Helper to access SecretStorage (available in Obsidian 1.11.0+)
+function getSecretStorage (app: Record<string, unknown>): { getSecret(id: string): string | null, setSecret(id: string, secret: string): void } | null {
+  const storage = (app as Record<string, unknown>).secretStorage
+  if (storage && typeof storage === 'object' && 'getSecret' in storage && 'setSecret' in storage) {
+    return storage as { getSecret(id: string): string | null, setSecret(id: string, secret: string): void }
+  }
+  return null
+}
+
 export default class ImmichPicker extends Plugin {
   settings: ImmichPickerSettings
   immichApi: ImmichApi
@@ -127,15 +136,16 @@ export default class ImmichPicker extends Plugin {
   // --- SecretStorage ---
 
   hasSecretStorage (): boolean {
-    return 'secretStorage' in this.app && (this.app as any).secretStorage != null
+    return getSecretStorage(this.app as unknown as Record<string, unknown>) != null
   }
 
   async getApiKey (): Promise<string> {
     if (this.cachedApiKey) return this.cachedApiKey
 
-    if (this.hasSecretStorage()) {
+    const storage = getSecretStorage(this.app as unknown as Record<string, unknown>)
+    if (storage) {
       try {
-        const secret = await (this.app as any).secretStorage.getSecret('immich-api-key')
+        const secret = storage.getSecret('immich-api-key')
         if (secret) {
           this.cachedApiKey = secret
           return secret
@@ -152,9 +162,10 @@ export default class ImmichPicker extends Plugin {
   async setApiKey (apiKey: string): Promise<void> {
     this.cachedApiKey = apiKey
 
-    if (this.hasSecretStorage()) {
+    const storage = getSecretStorage(this.app as unknown as Record<string, unknown>)
+    if (storage) {
       try {
-        await (this.app as any).secretStorage.saveSecret('immich-api-key', apiKey)
+        storage.setSecret('immich-api-key', apiKey)
         // Clear from plain-text settings
         this.settings.apiKey = ''
         await this.saveSettings()
@@ -170,9 +181,10 @@ export default class ImmichPicker extends Plugin {
 
   private async initApiKey (): Promise<void> {
     // Migrate from data.json to secretStorage if available
-    if (this.hasSecretStorage() && this.settings.apiKey) {
+    const storage = getSecretStorage(this.app as unknown as Record<string, unknown>)
+    if (storage && this.settings.apiKey) {
       try {
-        await (this.app as any).secretStorage.saveSecret('immich-api-key', this.settings.apiKey)
+        storage.setSecret('immich-api-key', this.settings.apiKey)
         this.cachedApiKey = this.settings.apiKey
         this.settings.apiKey = ''
         await this.saveSettings()
