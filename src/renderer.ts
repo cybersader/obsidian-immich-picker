@@ -60,7 +60,7 @@ export class GridView {
         const imageData = await requestUrl({
           url: thumbnailUrl,
           headers: {
-            'x-api-key': settings.apiKey
+            'x-api-key': this.plugin.cachedApiKey || settings.apiKey
           }
         })
 

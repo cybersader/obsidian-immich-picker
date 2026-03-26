@@ -433,7 +433,7 @@ export class ImmichPickerModal extends Modal {
       const thumbnailUrl = this.plugin.immichApi.getThumbnailUrl(assetId)
       const response = await requestUrl({
         url: thumbnailUrl,
-        headers: { 'x-api-key': this.plugin.settings.apiKey }
+        headers: { 'x-api-key': this.plugin.cachedApiKey || this.plugin.settings.apiKey }
       })
       const blob = new Blob([response.arrayBuffer])
       img.src = URL.createObjectURL(blob)
