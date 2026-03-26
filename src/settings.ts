@@ -384,26 +384,86 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
       .setName('Output format')
       .setHeading()
 
-    new Setting(containerEl)
-      .setName('Inserted Markdown')
-      .setDesc('The Markdown text inserted when adding a photo. Available variables:')
-      .addTextArea(text => text
-        .setPlaceholder(DEFAULT_SETTINGS.thumbnailMarkdown)
-        .setValue(this.plugin.settings.thumbnailMarkdown)
-        .onChange(async value => {
-          this.plugin.settings.thumbnailMarkdown = value
-          await this.plugin.saveSettings()
-        }))
-      .then(setting => {
-        const ul = setting.descEl.createEl('ul')
-        ul.createEl('li').setText('local_thumbnail_link - path to local thumbnail (or immich:// link in remote mode)')
-        ul.createEl('li').setText('immich_thumbnail_url - server thumbnail link')
-        ul.createEl('li').setText('immich_url - URL to the photo in Immich')
-        ul.createEl('li').setText('immich_asset_id - the Immich asset ID')
-        ul.createEl('li').setText('original_filename - original filename from Immich')
-        ul.createEl('li').setText('taken_date - date the photo was taken')
-        ul.createEl('li').setText('description - photo description from Immich')
-      })
+    const isRemoteMode = this.plugin.settings.imageMode === 'remote'
+    const useWikilinks = !(this.app.vault as any).getConfig('useMarkdownLinks')
+
+    if (isRemoteMode) {
+      // Remote mode uses a fixed format — show info instead of editable template
+      new Setting(containerEl)
+        .setName('Inserted markdown')
+        .then(setting => {
+          setting.descEl.appendText('Remote mode uses a fixed format (not customizable):')
+          setting.descEl.createEl('br')
+          setting.descEl.createEl('code', {
+            text: '[![immich:ASSET_ID](placeholder)](immich_url)'
+          })
+          setting.descEl.createEl('br')
+          setting.descEl.createEl('br')
+          setting.descEl.appendText('The post-processor replaces the placeholder with the actual image at render time.')
+        })
+    } else {
+      // Local/Shared mode — show editable template with presets
+      let templateTextArea: any
+
+      new Setting(containerEl)
+        .setName('Inserted markdown')
+        .setDesc('The markdown text inserted when adding a photo.')
+        .addTextArea(text => {
+          templateTextArea = text
+          text
+            .setPlaceholder(DEFAULT_SETTINGS.thumbnailMarkdown)
+            .setValue(this.plugin.settings.thumbnailMarkdown)
+            .onChange(async value => {
+              this.plugin.settings.thumbnailMarkdown = value
+              await this.plugin.saveSettings()
+            })
+        })
+        .then(setting => {
+          // Preset buttons
+          const btnContainer = setting.descEl.createDiv({ cls: 'immich-picker-preset-buttons' })
+          btnContainer.createEl('span', { text: 'Presets: ' })
+
+          const presets = [
+            { label: 'Markdown', value: '[![]({{local_thumbnail_link}})]({{immich_url}}) ', recommended: !useWikilinks },
+            { label: 'Wikilink', value: '![[{{local_thumbnail_link}}]]', recommended: useWikilinks },
+            { label: 'Image only', value: '![]({{local_thumbnail_link}})', recommended: false }
+          ]
+
+          for (const preset of presets) {
+            const btn = btnContainer.createEl('button', {
+              text: preset.label + (preset.recommended ? ' *' : ''),
+              cls: 'immich-picker-preset-btn'
+            })
+            btn.addEventListener('click', async () => {
+              this.plugin.settings.thumbnailMarkdown = preset.value
+              await this.plugin.saveSettings()
+              if (templateTextArea) {
+                templateTextArea.setValue(preset.value)
+              }
+            })
+          }
+
+          if (useWikilinks) {
+            btnContainer.createEl('br')
+            btnContainer.createEl('small', { text: '* recommended based on your vault link settings' })
+          } else {
+            btnContainer.createEl('br')
+            btnContainer.createEl('small', { text: '* recommended based on your vault link settings' })
+          }
+
+          // Variable reference
+          setting.descEl.createEl('br')
+          setting.descEl.appendText('Available variables:')
+          const ul = setting.descEl.createEl('ul')
+          ul.createEl('li').setText('local_thumbnail_link - path to the local thumbnail')
+          ul.createEl('li').setText('immich_thumbnail_url - server thumbnail link')
+          ul.createEl('li').setText('immich_url - link to the photo in Immich')
+          ul.createEl('li').setText('immich_asset_id - the Immich asset id')
+          ul.createEl('li').setText('original_filename - original filename from Immich')
+          ul.createEl('li').setText('taken_date - date the photo was taken')
+          ul.createEl('li').setText('description - photo description from Immich')
+        })
+    }
 
     new Setting(containerEl)
       .setName('Convert pasted Immich links')

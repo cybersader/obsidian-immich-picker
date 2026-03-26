@@ -318,8 +318,10 @@ export default class ImmichPicker extends Plugin {
         await this.ensureFolderExists(thumbnailFolder)
         await this.saveThumbnailToVault(assetId, savePath)
 
-        // Replace the remote image markdown with local path
-        updatedContent = updatedContent.replace(fullMatch, `![](${linkPath})`)
+        // Replace the remote image markdown with local path, respecting vault link format
+        const useWikilinks = !(this.app.vault as unknown as { getConfig(key: string): unknown }).getConfig('useMarkdownLinks')
+        const localImage = useWikilinks ? `![[${linkPath}]]` : `![](${linkPath})`
+        updatedContent = updatedContent.replace(fullMatch, localImage)
       }
 
       editor.setValue(updatedContent)
