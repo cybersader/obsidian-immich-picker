@@ -385,31 +385,31 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
       .setHeading()
 
     const isRemoteMode = this.plugin.settings.imageMode === 'remote'
-    const useWikilinks = !(this.app.vault as any).getConfig('useMarkdownLinks')
+    const vaultConfig = this.app.vault as unknown as { getConfig(key: string): unknown }
+    const useWikilinks = !vaultConfig.getConfig('useMarkdownLinks')
 
     if (isRemoteMode) {
       // Remote mode uses a fixed format — show info instead of editable template
       new Setting(containerEl)
-        .setName('Inserted markdown')
+        .setName('Inserted text format')
         .then(setting => {
           setting.descEl.appendText('Remote mode uses a fixed format (not customizable):')
           setting.descEl.createEl('br')
-          setting.descEl.createEl('code', {
-            text: '[![immich:ASSET_ID](placeholder)](immich_url)'
-          })
+          // eslint-disable-next-line obsidianmd/ui/sentence-case
+          setting.descEl.createEl('code', { text: '[![immich:id](placeholder)](link)' })
           setting.descEl.createEl('br')
           setting.descEl.createEl('br')
           setting.descEl.appendText('The post-processor replaces the placeholder with the actual image at render time.')
         })
     } else {
       // Local/Shared mode — show editable template with presets
-      let templateTextArea: any
+      let templateInput: { setValue(value: string): unknown } | null = null
 
       new Setting(containerEl)
-        .setName('Inserted markdown')
-        .setDesc('The markdown text inserted when adding a photo.')
+        .setName('Inserted text format')
+        .setDesc('Text inserted when adding a photo')
         .addTextArea(text => {
-          templateTextArea = text
+          templateInput = text
           text
             .setPlaceholder(DEFAULT_SETTINGS.thumbnailMarkdown)
             .setValue(this.plugin.settings.thumbnailMarkdown)
@@ -437,31 +437,25 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
             btn.addEventListener('click', async () => {
               this.plugin.settings.thumbnailMarkdown = preset.value
               await this.plugin.saveSettings()
-              if (templateTextArea) {
-                templateTextArea.setValue(preset.value)
-              }
+              templateInput?.setValue(preset.value)
             })
           }
 
-          if (useWikilinks) {
-            btnContainer.createEl('br')
-            btnContainer.createEl('small', { text: '* recommended based on your vault link settings' })
-          } else {
-            btnContainer.createEl('br')
-            btnContainer.createEl('small', { text: '* recommended based on your vault link settings' })
-          }
+          btnContainer.createEl('br')
+          btnContainer.createEl('small', { text: '* recommended based on your vault link settings' })
 
           // Variable reference
           setting.descEl.createEl('br')
           setting.descEl.appendText('Available variables:')
           const ul = setting.descEl.createEl('ul')
           ul.createEl('li').setText('local_thumbnail_link - path to the local thumbnail')
-          ul.createEl('li').setText('immich_thumbnail_url - server thumbnail link')
-          ul.createEl('li').setText('immich_url - link to the photo in Immich')
-          ul.createEl('li').setText('immich_asset_id - the Immich asset id')
-          ul.createEl('li').setText('original_filename - original filename from Immich')
+          // eslint-disable-next-line obsidianmd/ui/sentence-case
+          ul.createEl('li').setText('immich_thumbnail_url - the thumbnail link')
+          ul.createEl('li').setText('immich_url - link to the photo in the server')
+          ul.createEl('li').setText('immich_asset_id - the asset id')
+          ul.createEl('li').setText('original_filename - original filename')
           ul.createEl('li').setText('taken_date - date the photo was taken')
-          ul.createEl('li').setText('description - photo description from Immich')
+          ul.createEl('li').setText('description - photo description')
         })
     }
 
