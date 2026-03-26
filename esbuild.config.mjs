@@ -1,7 +1,6 @@
 import esbuild from "esbuild";
 import process from "process";
 import { builtinModules } from 'node:module'
-import { copyFileSync } from 'node:fs'
 
 const banner =
 `/*
@@ -42,27 +41,9 @@ const buildOptions = {
 	outfile: 'main.js',
 };
 
-const testVaultPluginDir = 'test-vault/.obsidian/plugins/immich-picker';
-
-// Plugin to copy build output to test vault
-const copyToTestVault = {
-	name: 'copy-to-test-vault',
-	setup(build) {
-		build.onEnd(() => {
-			try {
-				copyFileSync('main.js', `${testVaultPluginDir}/main.js`);
-				copyFileSync('manifest.json', `${testVaultPluginDir}/manifest.json`);
-				copyFileSync('styles.css', `${testVaultPluginDir}/styles.css`);
-			} catch {
-				// Test vault may not exist in CI
-			}
-		});
-	}
-};
-
 if (prod) {
-	await esbuild.build({ ...buildOptions, plugins: [copyToTestVault] });
+	await esbuild.build(buildOptions);
 } else {
-	const context = await esbuild.context({ ...buildOptions, plugins: [copyToTestVault] });
+	const context = await esbuild.context(buildOptions);
 	await context.watch();
 }
