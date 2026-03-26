@@ -27,20 +27,42 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
     }
   })
 
-  // Legacy format support: detect old immich:// and data URI formats in rendered HTML
+  // Post-processor: handles server-url, html-tag, and legacy formats
   plugin.registerMarkdownPostProcessor(async (el: HTMLElement) => {
-    // Handle legacy: ![immich:UUID](data:...) — alt text marker with data URI
     const images = el.querySelectorAll('img')
+    const serverUrl = plugin.settings.serverUrl
+
     for (const img of Array.from(images)) {
+      // Already processed
+      if (img.hasClass('immich-remote-image')) continue
+
+      const src = img.getAttribute('src') || ''
       const alt = img.getAttribute('alt') || ''
+
+      // Format: server-url — src contains Immich server thumbnail URL
+      if (serverUrl && src.includes(serverUrl) && src.includes('/api/assets/')) {
+        const urlMatch = src.match(/\/api\/assets\/([a-f0-9-]+)\/thumbnail/i)
+        if (urlMatch) {
+          await replaceImgSrc(plugin, img, urlMatch[1])
+          continue
+        }
+      }
+
+      // Format: html-tag — data-immich-id attribute
+      const dataId = img.getAttribute('data-immich-id')
+      if (dataId && dataId.match(/^[a-f0-9-]+$/i)) {
+        await replaceImgSrc(plugin, img, dataId)
+        continue
+      }
+
+      // Legacy: alt text marker (immich:UUID)
       const altMatch = alt.match(/^immich:([a-f0-9-]+)$/i)
       if (altMatch) {
         await replaceImgSrc(plugin, img, altMatch[1])
         continue
       }
 
-      // Handle legacy: immich://UUID in src
-      const src = img.getAttribute('src') || ''
+      // Legacy: immich://UUID in src
       const srcMatch = src.match(/immich:\/\/([a-f0-9-]+)/i)
       if (srcMatch) {
         await replaceImgSrc(plugin, img, srcMatch[1])

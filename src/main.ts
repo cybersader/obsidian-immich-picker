@@ -252,11 +252,21 @@ export default class ImmichPicker extends Plugin {
   }
 
   /**
-   * Remote mode: uses code block syntax rendered by the code block processor.
-   * Does NOT use the user's template — the processor handles rendering.
+   * Remote mode: generates markdown based on the selected remote format.
    */
   generateRemoteMarkdown (assetId: string): string {
-    return '\n```immich\n' + assetId + '\n```\n'
+    const format = this.settings.remoteFormat || 'server-url'
+
+    switch (format) {
+      case 'server-url':
+        return `![](${this.immichApi.getThumbnailUrl(assetId)}) `
+      case 'html-tag':
+        return `<img data-immich-id="${assetId}" alt="Immich photo" /> `
+      case 'code-block':
+        return '\n```immich\n' + assetId + '\n```\n'
+      default:
+        return `![](${this.immichApi.getThumbnailUrl(assetId)}) `
+    }
   }
 
   async generateSharedMarkdown (params: {
@@ -289,9 +299,12 @@ export default class ImmichPicker extends Plugin {
     }
 
     const content = editor.getValue()
-    // Match all remote formats: code blocks, data URI placeholders, and legacy immich:// protocol
+    // Match all remote formats
+    const serverUrlEscaped = this.settings.serverUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const patterns = [
       /```immich\n([a-f0-9-]+)\n```/gi,
+      new RegExp(`!\\[\\]\\(${serverUrlEscaped}/api/assets/([a-f0-9-]+)/thumbnail[^)]*\\)`, 'gi'),
+      /<img data-immich-id="([a-f0-9-]+)"[^>]*\/?>/gi,
       /!\[immich:([a-f0-9-]+)\]\(data:image\/[^)]+\)/gi,
       /!\[\]\(immich:\/\/([a-f0-9-]+)\)/gi,
       /!\[immich:([a-f0-9-]+)\]\([^)]*\)/gi

@@ -3,6 +3,7 @@ import { FolderSuggest } from './suggesters/FolderSuggester'
 import ImmichPicker from './main'
 
 export type GetDateFromOption = 'none' | 'title' | 'frontmatter';
+export type RemoteFormatOption = 'server-url' | 'html-tag' | 'code-block';
 
 export type ImageModeOption = 'local' | 'remote' | 'shared';
 
@@ -12,6 +13,7 @@ export interface ImmichPickerSettings {
   recentPhotosCount: number;
   gridColumns: number;
   imageMode: ImageModeOption;
+  remoteFormat: RemoteFormatOption;
   thumbnailWidth: number;
   thumbnailHeight: number;
   filename: string;
@@ -31,6 +33,7 @@ export const DEFAULT_SETTINGS: ImmichPickerSettings = {
   recentPhotosCount: 9,
   gridColumns: 3,
   imageMode: 'local',
+  remoteFormat: 'server-url',
   thumbnailWidth: 400,
   thumbnailHeight: 280,
   filename: '[immich_]YYYY-MM-DD--HH-mm-ss[.jpg]',
@@ -200,6 +203,25 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
         setting.descEl.createEl('br')
         setting.descEl.appendText('Shared: creates public Immich shared links (works without plugin, but URLs are public).')
       })
+
+    // Remote format sub-mode (only visible in remote mode)
+    if (this.plugin.settings.imageMode === 'remote') {
+      new Setting(containerEl)
+        .setName('Remote image format')
+        .setDesc('How remote images are stored in your notes')
+        .addDropdown(dropdown => {
+          dropdown
+            .addOption('server-url', 'Direct link to server')
+            .addOption('html-tag', 'Inline image tag')
+            .addOption('code-block', 'Rendered code block')
+            .setValue(this.plugin.settings.remoteFormat)
+            .onChange(async value => {
+              this.plugin.settings.remoteFormat = value as RemoteFormatOption
+              await this.plugin.saveSettings()
+              this.display()
+            })
+        })
+    }
 
     /*
      Date detection settings
