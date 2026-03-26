@@ -37,6 +37,7 @@ export class ImmichPickerModal extends Modal {
   currentAlbumAssets: ImmichAsset[] = []
   hasMoreResults = true
   noteDate: moment.Moment | null = null
+  selectedWidth = 0
 
   constructor (app: App, plugin: ImmichPicker, editor: Editor, view: MarkdownView) {
     super(app)
@@ -98,6 +99,29 @@ export class ImmichPickerModal extends Modal {
     this.dateBanner.hide()
 
     this.gridContainerEl = contentEl.createDiv({ cls: 'immich-picker-grid-container' })
+
+    // Size selector bubbles
+    this.selectedWidth = this.plugin.settings.displayWidth
+    const sizeRow = contentEl.createDiv({ cls: 'immich-picker-size-row' })
+    sizeRow.createSpan({ text: 'Size: ', cls: 'immich-picker-size-label' })
+    const sizes = [
+      { label: 'Original', value: 0 },
+      { label: '200', value: 200 },
+      { label: '400', value: 400 },
+      { label: '600', value: 600 },
+      { label: '800', value: 800 }
+    ]
+    for (const size of sizes) {
+      const bubble = sizeRow.createEl('button', {
+        text: size.label,
+        cls: 'immich-picker-size-bubble' + (this.selectedWidth === size.value ? ' is-active' : '')
+      })
+      bubble.addEventListener('click', () => {
+        this.selectedWidth = size.value
+        sizeRow.querySelectorAll('.immich-picker-size-bubble').forEach(b => b.removeClass('is-active'))
+        bubble.addClass('is-active')
+      })
+    }
 
     // footer with help text and load more
     this.footerEl = contentEl.createDiv({ cls: 'immich-picker-footer' })
@@ -514,6 +538,9 @@ export class ImmichPickerModal extends Modal {
       return
     }
 
+    // Apply selected width from modal bubbles
+    this.plugin.settings.displayWidth = this.selectedWidth
+
     const isLocal = this.plugin.settings.imageMode === 'local'
     const loadingNotice = new Notice(`Inserting ${this.currentAlbumAssets.length} photos...`, 0)
 
@@ -595,6 +622,9 @@ export class ImmichPickerModal extends Modal {
         this.close()
         return
       }
+
+      // Apply selected width from modal bubbles
+      this.plugin.settings.displayWidth = this.selectedWidth
 
       // Fetch asset details to get description
       const assetDetails = await this.plugin.immichApi.getAssetDetails(thumbnailImage.assetId)
