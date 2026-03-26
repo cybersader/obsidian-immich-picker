@@ -47,6 +47,18 @@ export default class ImmichPicker extends Plugin {
     })
 
     this.addCommand({
+      id: 'convert-remote-format',
+      name: 'Convert remote images to current format',
+      editorCallback: async (editor: Editor, view: MarkdownView) => {
+        if (!this.settings.serverUrl) {
+          new Notice('Please configure Immich server URL in settings')
+          return
+        }
+        await this.convertRemoteFormat(editor)
+      }
+    })
+
+    this.addCommand({
       id: 'convert-remote-to-local',
       name: 'Convert remote images to local thumbnails',
       editorCallback: async (editor: Editor, view: MarkdownView) => {
@@ -289,17 +301,12 @@ export default class ImmichPicker extends Plugin {
     })
   }
 
-  // --- Convert remote to local ---
+  // --- Convert between remote formats ---
 
-  async convertRemoteToLocal (editor: Editor, view: MarkdownView): Promise<void> {
-    const noteFile = view.file
-    if (!noteFile) {
-      new Notice('No active note')
-      return
-    }
-
-    const content = editor.getValue()
-    // Match all remote formats
+  /**
+   * Finds all remote Immich image references (any format) and returns matches with asset IDs.
+   */
+  private findRemoteReferences (content: string): { fullMatch: string, assetId: string }[] {
     const serverUrlEscaped = this.settings.serverUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const patterns = [
       /```immich\n([a-f0-9-]+)\n```/gi,
@@ -312,12 +319,44 @@ export default class ImmichPicker extends Plugin {
     const allMatches: { fullMatch: string, assetId: string }[] = []
     for (const pattern of patterns) {
       for (const match of content.matchAll(pattern)) {
-        // Avoid duplicates if same text matches multiple patterns
         if (!allMatches.some(m => m.fullMatch === match[0])) {
           allMatches.push({ fullMatch: match[0], assetId: match[1] })
         }
       }
     }
+    return allMatches
+  }
+
+  async convertRemoteFormat (editor: Editor): Promise<void> {
+    const content = editor.getValue()
+    const matches = this.findRemoteReferences(content)
+
+    if (matches.length === 0) {
+      new Notice('No remote Immich images found in this note')
+      return
+    }
+
+    let updatedContent = content
+    for (const { fullMatch, assetId } of matches) {
+      const newMarkdown = this.generateRemoteMarkdown(assetId)
+      updatedContent = updatedContent.replace(fullMatch, newMarkdown.trim())
+    }
+
+    editor.setValue(updatedContent)
+    new Notice(`Converted ${matches.length} images to ${this.settings.remoteFormat} format`)
+  }
+
+  // --- Convert remote to local ---
+
+  async convertRemoteToLocal (editor: Editor, view: MarkdownView): Promise<void> {
+    const noteFile = view.file
+    if (!noteFile) {
+      new Notice('No active note')
+      return
+    }
+
+    const content = editor.getValue()
+    const allMatches = this.findRemoteReferences(content)
 
     if (allMatches.length === 0) {
       new Notice('No remote Immich images found in this note')
