@@ -272,8 +272,6 @@ export default class ImmichPicker extends Plugin {
     switch (format) {
       case 'server-url':
         return `![](${this.immichApi.getThumbnailUrl(assetId)}) `
-      case 'html-tag':
-        return `<img data-immich-id="${assetId}" alt="Immich photo" /> `
       case 'code-block':
         return '\n```immich\n' + assetId + '\n```\n'
       default:

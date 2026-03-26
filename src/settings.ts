@@ -3,7 +3,7 @@ import { FolderSuggest } from './suggesters/FolderSuggester'
 import ImmichPicker from './main'
 
 export type GetDateFromOption = 'none' | 'title' | 'frontmatter';
-export type RemoteFormatOption = 'server-url' | 'html-tag' | 'code-block';
+export type RemoteFormatOption = 'server-url' | 'code-block';
 
 export type ImageModeOption = 'local' | 'remote' | 'shared';
 
@@ -208,18 +208,24 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
     if (this.plugin.settings.imageMode === 'remote') {
       new Setting(containerEl)
         .setName('Remote image format')
-        .setDesc('How remote images are stored in your notes')
         .addDropdown(dropdown => {
           dropdown
-            .addOption('server-url', 'Direct link to server')
-            .addOption('html-tag', 'Inline image tag')
-            .addOption('code-block', 'Rendered code block')
+            .addOption('server-url', 'Server link (recommended)')
+            .addOption('code-block', 'Code block')
             .setValue(this.plugin.settings.remoteFormat)
             .onChange(async value => {
               this.plugin.settings.remoteFormat = value as RemoteFormatOption
               await this.plugin.saveSettings()
               this.display()
             })
+        })
+        .then(setting => {
+          setting.descEl.appendText('Server link: standard markdown image. Shows broken image outside Obsidian.')
+          setting.descEl.createEl('br')
+          setting.descEl.appendText('Code block: Obsidian-only rendering. Shows text outside Obsidian.')
+          setting.descEl.createEl('br')
+          setting.descEl.createEl('br')
+          setting.descEl.appendText('Use "Convert remote images to current format" command to convert existing notes.')
         })
     }
 
