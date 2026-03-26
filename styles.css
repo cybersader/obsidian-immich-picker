@@ -3,6 +3,11 @@
   display: none !important;
 }
 
+/* Remote mode images */
+.immich-remote-image {
+  max-width: 100%;
+}
+
 /* Immich Picker Modal */
 .immich-picker-modal {
   width: 600px;

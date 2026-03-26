@@ -5,8 +5,9 @@ import { ImmichPickerModal } from './photoModal'
 import { handlebarParse } from './handlebars'
 import { registerImmichPostProcessor, clearImmichBlobCache } from './postProcessor'
 
-// 1x1 transparent GIF — CSP-compliant placeholder for remote mode
-const PLACEHOLDER_GIF = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+// 200x150 loading placeholder SVG — CSP-compliant, visible before post-processor replaces it
+// eslint-disable-next-line quotes
+const PLACEHOLDER_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='150'%3E%3Crect width='200' height='150' fill='%23e8e8e8'/%3E%3Ctext x='100' y='75' text-anchor='middle' dominant-baseline='middle' fill='%23888' font-size='14'%3ELoading...%3C/text%3E%3C/svg%3E"
 
 // Helper to access SecretStorage (available in Obsidian 1.11.0+)
 function getSecretStorage (app: Record<string, unknown>): { getSecret(id: string): string | null, setSecret(id: string, secret: string): void } | null {
@@ -258,7 +259,7 @@ export default class ImmichPicker extends Plugin {
    */
   generateRemoteMarkdown (assetId: string): string {
     const immichUrl = this.immichApi.getAssetUrl(assetId)
-    return `[![immich:${assetId}](${PLACEHOLDER_GIF})](${immichUrl}) `
+    return `[![immich:${assetId}](${PLACEHOLDER_IMG})](${immichUrl}) `
   }
 
   async generateSharedMarkdown (params: {
@@ -291,8 +292,8 @@ export default class ImmichPicker extends Plugin {
     }
 
     const content = editor.getValue()
-    // Match: ![immich:UUID](data:image/gif;base64,...)
-    const pattern = /!\[immich:([a-f0-9-]+)\]\(data:image\/gif;base64,[A-Za-z0-9+/=]+\)/gi
+    // Match: ![immich:UUID](data:image/...) — handles both gif and svg placeholders
+    const pattern = /!\[immich:([a-f0-9-]+)\]\(data:image\/[^)]+\)/gi
     const matches = [...content.matchAll(pattern)]
 
     if (matches.length === 0) {
