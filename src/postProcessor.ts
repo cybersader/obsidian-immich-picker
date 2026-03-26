@@ -15,52 +15,70 @@ export function clearImmichBlobCache (): void {
 }
 
 export function registerImmichPostProcessor (plugin: ImmichPicker): void {
+  // Code block processor: renders ```immich\nUUID\n``` as images (current format)
+  plugin.registerMarkdownCodeBlockProcessor('immich', async (source, el) => {
+    const lines = source.trim().split('\n')
+
+    for (const line of lines) {
+      const assetId = line.trim()
+      if (!assetId.match(/^[a-f0-9-]+$/i)) continue
+
+      renderImmichImage(plugin, el, assetId)
+    }
+  })
+
+  // Legacy format support: detect old immich:// and data URI formats in rendered HTML
   plugin.registerMarkdownPostProcessor(async (el: HTMLElement) => {
-    // Check both img elements and any elements with immich alt text
+    // Handle legacy: ![immich:UUID](data:...) — alt text marker with data URI
     const images = el.querySelectorAll('img')
     for (const img of Array.from(images)) {
       const alt = img.getAttribute('alt') || ''
-      const match = alt.match(/^immich:([a-f0-9-]+)$/i)
-      if (!match) continue
+      const altMatch = alt.match(/^immich:([a-f0-9-]+)$/i)
+      if (altMatch) {
+        await replaceImgSrc(plugin, img, altMatch[1])
+        continue
+      }
 
-      const assetId = match[1]
-
-      try {
-        const blobUrl = await fetchOrGetCached(plugin, assetId)
-        img.src = blobUrl
-        img.alt = ''
-        img.addClass('immich-remote-image')
-      } catch (e) {
-        console.error(`Failed to load Immich thumbnail for ${assetId}:`, e)
-        img.alt = `[Immich image unavailable: ${assetId}]`
+      // Handle legacy: immich://UUID in src
+      const src = img.getAttribute('src') || ''
+      const srcMatch = src.match(/immich:\/\/([a-f0-9-]+)/i)
+      if (srcMatch) {
+        await replaceImgSrc(plugin, img, srcMatch[1])
       }
     }
+  })
+}
 
-    // Also check for spans/links that contain the immich: pattern
-    // (Obsidian may not create an img for data URIs in some views)
-    const links = el.querySelectorAll('a')
-    for (const link of Array.from(links)) {
-      const innerImg = link.querySelector('img')
-      if (innerImg) continue // Already handled above
+async function replaceImgSrc (plugin: ImmichPicker, img: HTMLImageElement, assetId: string): Promise<void> {
+  try {
+    const blobUrl = await fetchOrGetCached(plugin, assetId)
+    img.src = blobUrl
+    img.alt = ''
+    img.addClass('immich-remote-image')
+  } catch (e) {
+    console.error(`Failed to load Immich thumbnail for ${assetId}:`, e)
+    img.alt = `[Immich image unavailable: ${assetId}]`
+  }
+}
 
-      // Check if the link contains text matching our pattern
-      const text = link.textContent || ''
-      const match = text.match(/immich:([a-f0-9-]+)/i)
-      if (!match) continue
+function renderImmichImage (plugin: ImmichPicker, el: HTMLElement, assetId: string): void {
+  const container = el.createDiv({ cls: 'immich-remote-container' })
+  const link = container.createEl('a', {
+    href: plugin.immichApi.getAssetUrl(assetId),
+    cls: 'external-link'
+  })
+  link.setAttr('target', '_blank')
+  link.setAttr('rel', 'noopener')
 
-      const assetId = match[1]
+  const img = link.createEl('img', { cls: 'immich-remote-image' })
+  img.alt = 'Loading from Immich...'
 
-      try {
-        const blobUrl = await fetchOrGetCached(plugin, assetId)
-        const img = document.createElement('img')
-        img.src = blobUrl
-        img.addClass('immich-remote-image')
-        link.empty()
-        link.appendChild(img)
-      } catch (e) {
-        console.error(`Failed to load Immich thumbnail for ${assetId}:`, e)
-      }
-    }
+  void fetchOrGetCached(plugin, assetId).then(blobUrl => {
+    img.src = blobUrl
+    img.alt = ''
+  }).catch(e => {
+    console.error(`Failed to load Immich thumbnail for ${assetId}:`, e)
+    img.alt = `[Immich image unavailable: ${assetId}]`
   })
 }
 

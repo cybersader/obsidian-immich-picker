@@ -5,9 +5,7 @@ import { ImmichPickerModal } from './photoModal'
 import { handlebarParse } from './handlebars'
 import { registerImmichPostProcessor, clearImmichBlobCache } from './postProcessor'
 
-// 200x150 loading placeholder SVG — CSP-compliant, visible before post-processor replaces it
-// eslint-disable-next-line quotes
-const PLACEHOLDER_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='150'%3E%3Crect width='200' height='150' fill='%23e8e8e8'/%3E%3Ctext x='100' y='75' text-anchor='middle' dominant-baseline='middle' fill='%23888' font-size='14'%3ELoading...%3C/text%3E%3C/svg%3E"
+// No placeholder needed — remote mode uses code block syntax rendered by code block processor
 
 // Helper to access SecretStorage (available in Obsidian 1.11.0+)
 function getSecretStorage (app: Record<string, unknown>): { getSecret(id: string): string | null, setSecret(id: string, secret: string): void } | null {
@@ -254,12 +252,11 @@ export default class ImmichPicker extends Plugin {
   }
 
   /**
-   * Remote mode: fixed format with data URI placeholder + alt text marker.
-   * Does NOT use the user's template — the post-processor needs a predictable format.
+   * Remote mode: uses code block syntax rendered by the code block processor.
+   * Does NOT use the user's template — the processor handles rendering.
    */
   generateRemoteMarkdown (assetId: string): string {
-    const immichUrl = this.immichApi.getAssetUrl(assetId)
-    return `[![immich:${assetId}](${PLACEHOLDER_IMG})](${immichUrl}) `
+    return '\n```immich\n' + assetId + '\n```\n'
   }
 
   async generateSharedMarkdown (params: {
@@ -292,26 +289,37 @@ export default class ImmichPicker extends Plugin {
     }
 
     const content = editor.getValue()
-    // Match: ![immich:UUID](data:image/...) — handles both gif and svg placeholders
-    const pattern = /!\[immich:([a-f0-9-]+)\]\(data:image\/[^)]+\)/gi
-    const matches = [...content.matchAll(pattern)]
+    // Match all remote formats: code blocks, data URI placeholders, and legacy immich:// protocol
+    const patterns = [
+      /```immich\n([a-f0-9-]+)\n```/gi,
+      /!\[immich:([a-f0-9-]+)\]\(data:image\/[^)]+\)/gi,
+      /!\[\]\(immich:\/\/([a-f0-9-]+)\)/gi,
+      /!\[immich:([a-f0-9-]+)\]\([^)]*\)/gi
+    ]
+    const allMatches: { fullMatch: string, assetId: string }[] = []
+    for (const pattern of patterns) {
+      for (const match of content.matchAll(pattern)) {
+        // Avoid duplicates if same text matches multiple patterns
+        if (!allMatches.some(m => m.fullMatch === match[0])) {
+          allMatches.push({ fullMatch: match[0], assetId: match[1] })
+        }
+      }
+    }
 
-    if (matches.length === 0) {
+    if (allMatches.length === 0) {
       new Notice('No remote Immich images found in this note')
       return
     }
 
-    const loadingNotice = new Notice(`Converting ${matches.length} remote images to local...`, 0)
+    const loadingNotice = new Notice(`Converting ${allMatches.length} remote images to local...`, 0)
 
     try {
       const noteFolder = noteFile.path.split('/').slice(0, -1).join('/')
       let updatedContent = content
 
-      for (let i = 0; i < matches.length; i++) {
-        const match = matches[i]
-        const assetId = match[1]
-        const fullMatch = match[0]
-        loadingNotice.setMessage(`Converting image ${i + 1}/${matches.length}...`)
+      for (let i = 0; i < allMatches.length; i++) {
+        const { fullMatch, assetId } = allMatches[i]
+        loadingNotice.setMessage(`Converting image ${i + 1}/${allMatches.length}...`)
 
         const creationTime = moment()
         const filename = creationTime.format(this.settings.filename)
@@ -327,7 +335,7 @@ export default class ImmichPicker extends Plugin {
 
       editor.setValue(updatedContent)
       loadingNotice.hide()
-      new Notice(`Converted ${matches.length} images to local thumbnails`)
+      new Notice(`Converted ${allMatches.length} images to local thumbnails`)
     } catch (e) {
       loadingNotice.hide()
       console.error('Failed to convert remote images:', e)
