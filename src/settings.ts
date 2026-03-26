@@ -14,6 +14,7 @@ export interface ImmichPickerSettings {
   gridColumns: number;
   imageMode: ImageModeOption;
   remoteFormat: RemoteFormatOption;
+  displayWidth: number;
   thumbnailWidth: number;
   thumbnailHeight: number;
   filename: string;
@@ -34,6 +35,7 @@ export const DEFAULT_SETTINGS: ImmichPickerSettings = {
   gridColumns: 3,
   imageMode: 'local',
   remoteFormat: 'server-url',
+  displayWidth: 0,
   thumbnailWidth: 400,
   thumbnailHeight: 280,
   filename: '[immich_]YYYY-MM-DD--HH-mm-ss[.jpg]',
@@ -228,6 +230,24 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
           setting.descEl.appendText('Use "Convert remote images to current format" command to convert existing notes.')
         })
     }
+
+    // Display width (shown in all modes)
+    new Setting(containerEl)
+      .setName('Display width')
+      .setDesc('Default width for inserted images (in pixels). Set to 0 for original size.')
+      .addDropdown(dropdown => {
+        dropdown
+          .addOption('0', 'Original size')
+          .addOption('200', '200px')
+          .addOption('400', '400px')
+          .addOption('600', '600px')
+          .addOption('800', '800px')
+          .setValue(this.plugin.settings.displayWidth.toString())
+          .onChange(async value => {
+            this.plugin.settings.displayWidth = parseInt(value, 10)
+            await this.plugin.saveSettings()
+          })
+      })
 
     /*
      Date detection settings
@@ -452,9 +472,9 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
           btnContainer.createEl('span', { text: 'Presets: ' })
 
           const presets = [
-            { label: 'Markdown', value: '[![]({{local_thumbnail_link}})]({{immich_url}}) ', recommended: !useWikilinks },
-            { label: 'Wikilink', value: '![[{{local_thumbnail_link}}]]', recommended: useWikilinks },
-            { label: 'Image only', value: '![]({{local_thumbnail_link}})', recommended: false }
+            { label: 'Markdown', value: '[![{{display_width}}]({{local_thumbnail_link}})]({{immich_url}}) ', recommended: !useWikilinks },
+            { label: 'Wikilink', value: '![[{{local_thumbnail_link}}{{display_width}}]]', recommended: useWikilinks },
+            { label: 'Image only', value: '![{{display_width}}]({{local_thumbnail_link}})', recommended: false }
           ]
 
           for (const preset of presets) {
@@ -484,6 +504,8 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
           ul.createEl('li').setText('original_filename - original filename')
           ul.createEl('li').setText('taken_date - date the photo was taken')
           ul.createEl('li').setText('description - photo description')
+          // eslint-disable-next-line obsidianmd/ui/sentence-case
+          ul.createEl('li').setText('display_width - image width from settings (e.g. |400)')
         })
     }
 

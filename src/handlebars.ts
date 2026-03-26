@@ -6,6 +6,7 @@ export interface HandlebarTemplate {
   original_filename?: string;
   taken_date?: string;
   description?: string;
+  display_width?: string;
 }
 
 export function handlebarParse (content: string, template: HandlebarTemplate) {

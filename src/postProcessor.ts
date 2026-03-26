@@ -15,15 +15,26 @@ export function clearImmichBlobCache (): void {
 }
 
 export function registerImmichPostProcessor (plugin: ImmichPicker): void {
-  // Code block processor: renders ```immich\nUUID\n``` as images (current format)
+  // Code block processor: renders ```immich\nUUID\nwidth=400\n``` as images
   plugin.registerMarkdownCodeBlockProcessor('immich', async (source, el) => {
     const lines = source.trim().split('\n')
+    let assetId = ''
+    let width = 0
 
     for (const line of lines) {
-      const assetId = line.trim()
-      if (!assetId.match(/^[a-f0-9-]+$/i)) continue
+      const trimmed = line.trim()
+      const widthMatch = trimmed.match(/^width=(\d+)$/i)
+      if (widthMatch) {
+        width = parseInt(widthMatch[1], 10)
+        continue
+      }
+      if (trimmed.match(/^[a-f0-9-]+$/i)) {
+        assetId = trimmed
+      }
+    }
 
-      renderImmichImage(plugin, el, assetId)
+    if (assetId) {
+      renderImmichImage(plugin, el, assetId, width)
     }
   })
 
@@ -83,7 +94,7 @@ async function replaceImgSrc (plugin: ImmichPicker, img: HTMLImageElement, asset
   }
 }
 
-function renderImmichImage (plugin: ImmichPicker, el: HTMLElement, assetId: string): void {
+function renderImmichImage (plugin: ImmichPicker, el: HTMLElement, assetId: string, width = 0): void {
   const container = el.createDiv({ cls: 'immich-remote-container' })
   const link = container.createEl('a', {
     href: plugin.immichApi.getAssetUrl(assetId),
@@ -93,6 +104,7 @@ function renderImmichImage (plugin: ImmichPicker, el: HTMLElement, assetId: stri
   link.setAttr('rel', 'noopener')
 
   const img = link.createEl('img', { cls: 'immich-remote-image' })
+  if (width > 0) img.width = width
   img.alt = 'Loading from Immich...'
 
   void fetchOrGetCached(plugin, assetId).then(blobUrl => {

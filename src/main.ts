@@ -258,6 +258,11 @@ export default class ImmichPicker extends Plugin {
 
   // --- Markdown generation ---
 
+  private getWidthAlt (): string {
+    const w = this.settings.displayWidth
+    return w > 0 ? `|${w}` : ''
+  }
+
   generateThumbnailMarkdown (params: {
     linkPath: string,
     assetId: string,
@@ -272,7 +277,8 @@ export default class ImmichPicker extends Plugin {
       immich_url: this.immichApi.getAssetUrl(params.assetId),
       original_filename: params.originalFilename,
       taken_date: params.takenDate,
-      description: params.description
+      description: params.description,
+      display_width: this.getWidthAlt()
     })
   }
 
@@ -281,14 +287,16 @@ export default class ImmichPicker extends Plugin {
    */
   generateRemoteMarkdown (assetId: string): string {
     const format = this.settings.remoteFormat || 'server-url'
+    const widthAlt = this.getWidthAlt()
+    const w = this.settings.displayWidth
 
     switch (format) {
       case 'server-url':
-        return `![](${this.immichApi.getThumbnailUrl(assetId)}) `
+        return `![${widthAlt}](${this.immichApi.getThumbnailUrl(assetId)}) `
       case 'code-block':
-        return '\n```immich\n' + assetId + '\n```\n'
+        return '\n```immich\n' + assetId + (w > 0 ? `\nwidth=${w}` : '') + '\n```\n'
       default:
-        return `![](${this.immichApi.getThumbnailUrl(assetId)}) `
+        return `![${widthAlt}](${this.immichApi.getThumbnailUrl(assetId)}) `
     }
   }
 
@@ -308,7 +316,8 @@ export default class ImmichPicker extends Plugin {
       immich_url: this.immichApi.getAssetUrl(params.assetId),
       original_filename: params.originalFilename,
       taken_date: params.takenDate,
-      description: params.description
+      description: params.description,
+      display_width: this.getWidthAlt()
     })
   }
 

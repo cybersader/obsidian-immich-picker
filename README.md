@@ -202,6 +202,27 @@ npm run build
 npm run lint
 ```
 
+## Companion Plugins
+
+These plugins work well alongside Immich Picker for image management:
+
+| Plugin | What it adds |
+|--------|-------------|
+| [Image Converter](https://github.com/xRyul/obsidian-image-converter) | Drag-to-resize, compress, convert formats, batch processing, annotations |
+| [Pixel Perfect Image](https://github.com/johansan/pixel-perfect-image) | Context menu resizing, scroll wheel zoom, percentage presets |
+| [Image Toolkit](https://github.com/sissilab/obsidian-image-toolkit) | Full-screen preview, zoom, rotate, flip, pin multiple images |
+
+Immich Picker inserts standard markdown image syntax that these plugins can enhance with visual resizing controls. You can also set a default display width in Immich Picker settings to control the initial size of inserted images.
+
+## Roadmap
+
+Planned features for future releases:
+
+- **Visual size picker**: Click-to-choose image dimensions at insertion time with a visual grid overlay showing the photo at different preset sizes
+- **Folder/file context menu**: Right-click a folder or file to convert all Immich images within
+- **Mobile optimization**: Improved touch-friendly UI for the photo picker and conversion modal
+- **Immich Public Proxy support**: Direct integration with [immich-public-proxy](https://github.com/alangrainger/immich-public-proxy) for secure public sharing
+
 ## Attribution
 
 Based on [obsidian-google-photos](https://github.com/alangrainger/obsidian-google-photos) by Alan Grainger (GPL-3.0).
