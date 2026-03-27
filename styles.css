@@ -13,8 +13,9 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 0;
+  padding: 4px 0 2px;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .immich-picker-size-label {
@@ -46,14 +47,14 @@
 
 /* Immich Picker Modal */
 .immich-picker-modal {
-  width: 600px;
+  width: 700px;
   max-width: 90vw;
-  height: 70vh;
+  height: 85vh;
 }
 
 .immich-picker-modal .modal-content {
   overflow-y: auto;
-  height: calc(70vh - 60px);
+  height: calc(85vh - 60px);
   display: flex;
   flex-direction: column;
 }
@@ -62,7 +63,7 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  min-height: 0;
+  min-height: 200px;
 }
 
 /* Photo Grid */
@@ -180,10 +181,11 @@
 .immich-picker-footer {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 8px 0;
-  margin-top: 8px;
+  gap: 2px;
+  padding: 4px 0 0;
+  margin-top: 4px;
   border-top: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
 }
 
 .immich-picker-footer-row {
