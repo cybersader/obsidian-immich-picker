@@ -1,6 +1,7 @@
 import { App, moment, Notice, PluginSettingTab, Setting } from 'obsidian'
 import { FolderSuggest } from './suggesters/FolderSuggester'
 import ImmichPicker from './main'
+import { shareCredentials, importCredentials } from './credentialSharing'
 
 export type GetDateFromOption = 'none' | 'title' | 'frontmatter';
 export type RemoteFormatOption = 'server-url' | 'code-block';
@@ -522,6 +523,75 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
         setting.descEl.createEl('code', { text: 'https://immich.example.com/photos/abc-123' })
         setting.descEl.appendText('), automatically download the thumbnail and insert it as markdown instead of pasting the plain URL.')
       })
+
+    /*
+     Credential sharing
+     */
+
+    new Setting(containerEl)
+      .setName('Credential sharing')
+      .setHeading()
+      .setDesc('Share your server credentials with other vaults on this machine.')
+
+    let shareDuration = 300000 // 5 min default
+
+    new Setting(containerEl)
+      .setName('Share credentials')
+      .setDesc('Temporarily share your credentials. A pin will be shown.')
+      .addDropdown(dropdown => {
+        dropdown
+          .addOption('300000', '5 minutes')
+          .addOption('1800000', '30 minutes')
+          .addOption('3600000', '1 hour')
+          .addOption('86400000', '24 hours')
+          .setValue('300000')
+          .onChange(value => { shareDuration = parseInt(value, 10) })
+      })
+      .addButton(btn => btn
+        .setButtonText('Share')
+        .setCta()
+        .onClick(async () => {
+          const apiKey = await this.plugin.getApiKey()
+          if (!this.plugin.settings.serverUrl || !apiKey) {
+            new Notice('Configure server and API key first')
+            return
+          }
+          const pin = await shareCredentials(
+            this.plugin.settings.serverUrl,
+            apiKey,
+            shareDuration
+          )
+          new Notice(`Sharing enabled! PIN: ${pin}`, 30000)
+        }))
+
+    new Setting(containerEl)
+      .setName('Import shared credentials')
+      .setDesc('Import credentials shared from another vault on this machine.')
+      .addText(text => text
+        .setPlaceholder('Enter 4-digit pin')
+        .onChange(() => { /* just capture input */ }))
+      .addButton(btn => btn
+        .setButtonText('Import')
+        .onClick(async () => {
+          const pinInput = containerEl.querySelector<HTMLInputElement>(
+            '.immich-picker-settings input[placeholder="Enter 4-digit pin"]'
+          )
+          const pin = pinInput?.value?.trim()
+          if (!pin || pin.length !== 4) {
+            new Notice('Enter the 4-digit pin shown on the sharing device')
+            return
+          }
+          const result = await importCredentials(pin)
+          if (result) {
+            await this.plugin.setApiKey(result.apiKey)
+            this.plugin.settings.serverUrl = result.serverUrl
+            await this.plugin.saveSettings()
+            new Notice('Credentials imported successfully!')
+            this.display()
+          } else {
+            new Notice('No shared credentials found, or invalid pin')
+          }
+        }))
   }
 
   updateFilenamePreview (el: HTMLElement, format: string): void {
