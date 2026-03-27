@@ -262,20 +262,23 @@ export default class ImmichPicker extends Plugin {
    * Computes display dimensions using "fit long edge" logic.
    * Returns `|WxH` if dimensions known, `|W` if only max size set, or empty string.
    */
+  /**
+   * Returns the width alt text for image sizing.
+   * Uses width-only format (e.g. |400) so Obsidian preserves aspect ratio.
+   * If original dimensions are known and the image is already smaller than
+   * maxSize, returns empty (no resize needed).
+   */
   getWidthAlt (origWidth?: number, origHeight?: number): string {
     const maxSize = this.settings.displayWidth
     if (maxSize <= 0) return ''
 
-    if (origWidth && origHeight && origWidth > 0 && origHeight > 0) {
+    // If we know the dimensions, skip sizing if image is already small enough
+    if (origWidth && origHeight) {
       const longEdge = Math.max(origWidth, origHeight)
-      if (longEdge <= maxSize) return '' // Already smaller than max
-      const scale = maxSize / longEdge
-      const w = Math.round(origWidth * scale)
-      const h = Math.round(origHeight * scale)
-      return `|${w}x${h}`
+      if (longEdge <= maxSize) return ''
     }
 
-    // No dimensions available — fall back to width only
+    // Width-only — Obsidian handles aspect ratio automatically
     return `|${maxSize}`
   }
 
