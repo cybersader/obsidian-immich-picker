@@ -258,9 +258,25 @@ export default class ImmichPicker extends Plugin {
 
   // --- Markdown generation ---
 
-  private getWidthAlt (): string {
-    const w = this.settings.displayWidth
-    return w > 0 ? `|${w}` : ''
+  /**
+   * Computes display dimensions using "fit long edge" logic.
+   * Returns `|WxH` if dimensions known, `|W` if only max size set, or empty string.
+   */
+  getWidthAlt (origWidth?: number, origHeight?: number): string {
+    const maxSize = this.settings.displayWidth
+    if (maxSize <= 0) return ''
+
+    if (origWidth && origHeight && origWidth > 0 && origHeight > 0) {
+      const longEdge = Math.max(origWidth, origHeight)
+      if (longEdge <= maxSize) return '' // Already smaller than max
+      const scale = maxSize / longEdge
+      const w = Math.round(origWidth * scale)
+      const h = Math.round(origHeight * scale)
+      return `|${w}x${h}`
+    }
+
+    // No dimensions available — fall back to width only
+    return `|${maxSize}`
   }
 
   generateThumbnailMarkdown (params: {
@@ -268,7 +284,9 @@ export default class ImmichPicker extends Plugin {
     assetId: string,
     originalFilename: string,
     takenDate: string,
-    description: string
+    description: string,
+    origWidth?: number,
+    origHeight?: number
   }): string {
     return handlebarParse(this.settings.thumbnailMarkdown, {
       local_thumbnail_link: params.linkPath,
@@ -278,16 +296,16 @@ export default class ImmichPicker extends Plugin {
       original_filename: params.originalFilename,
       taken_date: params.takenDate,
       description: params.description,
-      display_width: this.getWidthAlt()
+      display_width: this.getWidthAlt(params.origWidth, params.origHeight)
     })
   }
 
   /**
    * Remote mode: generates markdown based on the selected remote format.
    */
-  generateRemoteMarkdown (assetId: string): string {
+  generateRemoteMarkdown (assetId: string, origWidth?: number, origHeight?: number): string {
     const format = this.settings.remoteFormat || 'server-url'
-    const widthAlt = this.getWidthAlt()
+    const widthAlt = this.getWidthAlt(origWidth, origHeight)
     const w = this.settings.displayWidth
 
     switch (format) {
@@ -304,7 +322,9 @@ export default class ImmichPicker extends Plugin {
     assetId: string,
     originalFilename: string,
     takenDate: string,
-    description: string
+    description: string,
+    origWidth?: number,
+    origHeight?: number
   }): Promise<string> {
     const sharedLink = await this.immichApi.createSharedLink(params.assetId)
     const sharedThumbnailUrl = this.immichApi.getSharedThumbnailUrl(params.assetId, sharedLink.key)
@@ -317,7 +337,7 @@ export default class ImmichPicker extends Plugin {
       original_filename: params.originalFilename,
       taken_date: params.takenDate,
       description: params.description,
-      display_width: this.getWidthAlt()
+      display_width: this.getWidthAlt(params.origWidth, params.origHeight)
     })
   }
 

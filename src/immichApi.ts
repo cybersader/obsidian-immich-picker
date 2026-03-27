@@ -13,6 +13,8 @@ export interface ImmichAssetDetails {
   id: string;
   exifInfo?: {
     description?: string;
+    exifImageWidth?: number;
+    exifImageHeight?: number;
   };
 }
 

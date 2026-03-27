@@ -563,20 +563,24 @@ export class ImmichPickerModal extends Modal {
 
         const creationTime = window.moment(asset.fileCreatedAt)
 
-        // Get description
+        // Get description and dimensions
         const assetDetails = await this.plugin.immichApi.getAssetDetails(asset.id)
         const description = assetDetails.exifInfo?.description || ''
+        const origWidth = assetDetails.exifInfo?.exifImageWidth
+        const origHeight = assetDetails.exifInfo?.exifImageHeight
 
         let linkText: string
 
         if (this.plugin.settings.imageMode === 'remote') {
-          linkText = this.plugin.generateRemoteMarkdown(asset.id)
+          linkText = this.plugin.generateRemoteMarkdown(asset.id, origWidth, origHeight)
         } else if (this.plugin.settings.imageMode === 'shared') {
           linkText = await this.plugin.generateSharedMarkdown({
             assetId: asset.id,
             originalFilename: asset.originalFileName,
             takenDate: creationTime.format(),
-            description
+            description,
+            origWidth,
+            origHeight
           })
         } else {
           const filename = creationTime.format(this.plugin.settings.filename)
@@ -589,7 +593,9 @@ export class ImmichPickerModal extends Modal {
             assetId: asset.id,
             originalFilename: asset.originalFileName,
             takenDate: creationTime.format(),
-            description
+            description,
+            origWidth,
+            origHeight
           })
         }
 
@@ -629,17 +635,21 @@ export class ImmichPickerModal extends Modal {
       // Fetch asset details to get description
       const assetDetails = await this.plugin.immichApi.getAssetDetails(thumbnailImage.assetId)
       const description = assetDetails.exifInfo?.description || ''
+      const origWidth = assetDetails.exifInfo?.exifImageWidth
+      const origHeight = assetDetails.exifInfo?.exifImageHeight
 
       let linkText: string
 
       if (this.plugin.settings.imageMode === 'remote') {
-        linkText = this.plugin.generateRemoteMarkdown(thumbnailImage.assetId)
+        linkText = this.plugin.generateRemoteMarkdown(thumbnailImage.assetId, origWidth, origHeight)
       } else if (this.plugin.settings.imageMode === 'shared') {
         linkText = await this.plugin.generateSharedMarkdown({
           assetId: thumbnailImage.assetId,
           originalFilename: thumbnailImage.originalFilename,
           takenDate: thumbnailImage.creationTime.format(),
-          description
+          description,
+          origWidth,
+          origHeight
         })
       } else {
         const noteFolder = noteFile.path.split('/').slice(0, -1).join('/')
@@ -652,7 +662,9 @@ export class ImmichPickerModal extends Modal {
           assetId: thumbnailImage.assetId,
           originalFilename: thumbnailImage.originalFilename,
           takenDate: thumbnailImage.creationTime.format(),
-          description
+          description,
+          origWidth,
+          origHeight
         })
       }
 
