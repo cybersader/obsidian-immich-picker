@@ -1,7 +1,7 @@
 import { App, moment, Notice, PluginSettingTab, Setting } from 'obsidian'
 import { FolderSuggest } from './suggesters/FolderSuggester'
 import ImmichPicker from './main'
-import { shareCredentials, importCredentials, isCredentialSharingAvailable } from './credentialSharing'
+import { createVaultShare, importVaultShare, hasVaultShare, createShareString, importShareString } from './credentialSharing'
 
 export type GetDateFromOption = 'none' | 'title' | 'frontmatter';
 export type RemoteFormatOption = 'server-url' | 'code-block';
@@ -525,21 +525,37 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
       })
 
     /*
-     Credential sharing (desktop only)
+     Credential sharing
      */
-
-    if (!isCredentialSharingAvailable()) return
 
     new Setting(containerEl)
       .setName('Credential sharing')
       .setHeading()
-      .setDesc('Share your server credentials with other vaults on this machine.')
+      .setDesc('Share credentials with other vaults or devices.')
 
-    let shareDuration = 300000 // 5 min default
+    let shareMethod: 'vault' | 'string' = 'vault'
+    let shareDuration = 300000
 
     new Setting(containerEl)
-      .setName('Share credentials')
-      .setDesc('Temporarily share your credentials. A pin will be shown.')
+      .setName('Sharing method')
+      .addDropdown(dropdown => {
+        dropdown
+          .addOption('vault', 'Vault sync')
+          .addOption('string', 'Share string')
+          .setValue(shareMethod)
+          .onChange(value => {
+            shareMethod = value as 'vault' | 'string'
+            this.display()
+          })
+      })
+      .then(setting => {
+        setting.descEl.appendText('Vault sync: credentials sync with your vault automatically.')
+        setting.descEl.createEl('br')
+        setting.descEl.appendText('Share string: copy an encrypted string to share manually.')
+      })
+
+    new Setting(containerEl)
+      .setName('Duration')
       .addDropdown(dropdown => {
         dropdown
           .addOption('300000', '5 minutes')
@@ -555,43 +571,79 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
         .onClick(async () => {
           const apiKey = await this.plugin.getApiKey()
           if (!this.plugin.settings.serverUrl || !apiKey) {
-            new Notice('Configure server and API key first')
+            new Notice('Configure server and credentials first')
             return
           }
-          const pin = await shareCredentials(
-            this.plugin.settings.serverUrl,
-            apiKey,
-            shareDuration
-          )
-          new Notice(`Sharing enabled! PIN: ${pin}`, 30000)
+          if (shareMethod === 'vault') {
+            const pin = await createVaultShare(this.plugin, this.plugin.settings.serverUrl, apiKey, shareDuration)
+            new Notice(`Sharing via vault sync! PIN: ${pin}`, 30000)
+          } else {
+            const { pin, shareString } = await createShareString(this.plugin.settings.serverUrl, apiKey, shareDuration)
+            navigator.clipboard.writeText(shareString)
+            new Notice(`PIN: ${pin} — Share string copied to clipboard!`, 30000)
+            // Show the string in a textarea for manual copy
+            this.display()
+          }
         }))
 
+    // Vault sync import — show if shared creds detected
+    void hasVaultShare(this.plugin).then(available => {
+      if (available) {
+        new Setting(containerEl)
+          .setName('Shared credentials available')
+          .setDesc('Enter the pin to import')
+          .addText(text => text.setPlaceholder('4-digit pin'))
+          .addButton(btn => btn
+            .setButtonText('Import')
+            .setCta()
+            .onClick(async () => {
+              const input = btn.buttonEl.parentElement?.querySelector('input')
+              const pin = input?.value?.trim()
+              if (!pin || pin.length !== 4) {
+                new Notice('Enter the 4-digit pin')
+                return
+              }
+              const result = await importVaultShare(this.plugin, pin)
+              if (result) {
+                await this.plugin.setApiKey(result.apiKey)
+                this.plugin.settings.serverUrl = result.serverUrl
+                await this.plugin.saveSettings()
+                new Notice('Credentials imported!')
+                this.display()
+              } else {
+                new Notice('Invalid pin or credentials expired')
+              }
+            }))
+      }
+    })
+
+    // Share string import — always visible
     new Setting(containerEl)
-      .setName('Import shared credentials')
-      .setDesc('Import credentials shared from another vault on this machine.')
-      .addText(text => text
-        .setPlaceholder('Enter 4-digit pin')
-        .onChange(() => { /* just capture input */ }))
+      .setName('Import from share string')
+      .setDesc('Paste a share string and enter the pin')
+      .addTextArea(text => text.setPlaceholder('Paste share string here'))
+      .addText(text => text.setPlaceholder('Pin'))
       .addButton(btn => btn
         .setButtonText('Import')
         .onClick(async () => {
-          const pinInput = containerEl.querySelector<HTMLInputElement>(
-            '.immich-picker-settings input[placeholder="Enter 4-digit pin"]'
-          )
+          const settingEl = btn.buttonEl.closest('.setting-item')
+          const textarea = settingEl?.querySelector('textarea')
+          const pinInput = settingEl?.querySelector<HTMLInputElement>('input[placeholder="Pin"]')
+          const str = textarea?.value?.trim()
           const pin = pinInput?.value?.trim()
-          if (!pin || pin.length !== 4) {
-            new Notice('Enter the 4-digit pin shown on the sharing device')
+          if (!str || !pin || pin.length !== 4) {
+            new Notice('Paste the share string and enter the 4-digit pin')
             return
           }
-          const result = await importCredentials(pin)
+          const result = await importShareString(str, pin)
           if (result) {
             await this.plugin.setApiKey(result.apiKey)
             this.plugin.settings.serverUrl = result.serverUrl
             await this.plugin.saveSettings()
-            new Notice('Credentials imported successfully!')
+            new Notice('Credentials imported!')
             this.display()
           } else {
-            new Notice('No shared credentials found, or invalid pin')
+            new Notice('Invalid share string, wrong pin, or expired')
           }
         }))
   }

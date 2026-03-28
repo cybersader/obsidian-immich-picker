@@ -5,7 +5,7 @@ import { ImmichPickerModal } from './photoModal'
 import { handlebarParse } from './handlebars'
 import { registerImmichPostProcessor, clearImmichBlobCache } from './postProcessor'
 import { ConversionModal } from './conversionModal'
-import { cleanupExpiredBlobs } from './credentialSharing'
+import { hasVaultShare } from './credentialSharing'
 
 // No placeholder needed — remote mode uses code block syntax rendered by code block processor
 
@@ -31,8 +31,12 @@ export default class ImmichPicker extends Plugin {
     // Cache API key (migrate from data.json to secretStorage if available)
     await this.initApiKey()
 
-    // Clean up any expired credential sharing blobs
-    cleanupExpiredBlobs()
+    // Check for vault-synced shared credentials
+    void hasVaultShare(this).then(available => {
+      if (available) {
+        new Notice('Shared Immich credentials available — open plugin settings to import')
+      }
+    })
 
     this.addSettingTab(new ImmichPickerSettingTab(this.app, this))
 

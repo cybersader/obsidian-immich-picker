@@ -1,22 +1,6 @@
-// Dynamic imports — Node.js modules not available on mobile
-let fs: typeof import('fs') | null = null
-let os: typeof import('os') | null = null
-let pathMod: typeof import('path') | null = null
+import ImmichPicker from './main'
 
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  fs = require('fs')
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  os = require('os')
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  pathMod = require('path')
-} catch {
-  // Mobile — credential sharing unavailable
-}
-
-const HANDOFF_PREFIX = 'immich-picker-share-'
-
-interface HandoffBlob {
+interface EncryptedBlob {
   serverUrl: string;
   encryptedApiKey: string;
   salt: string;
@@ -24,42 +8,10 @@ interface HandoffBlob {
   expiresAt: number;
 }
 
+// --- Shared crypto helpers ---
+
 function generatePin (): string {
   return String(Math.floor(1000 + Math.random() * 9000))
-}
-
-export function isCredentialSharingAvailable (): boolean {
-  return fs != null && os != null && pathMod != null
-}
-
-function getHandoffDir (): string {
-  return os!.tmpdir()
-}
-
-function getHandoffFiles (): string[] {
-  if (!isCredentialSharingAvailable()) return []
-  const dir = getHandoffDir()
-  try {
-    return fs!.readdirSync(dir)
-      .filter(f => f.startsWith(HANDOFF_PREFIX) && f.endsWith('.json'))
-      .map(f => pathMod!.join(dir, f))
-  } catch {
-    return []
-  }
-}
-
-async function deriveKey (pin: string, salt: Uint8Array): Promise<CryptoKey> {
-  const encoder = new TextEncoder()
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw', encoder.encode(pin) as BufferSource, 'PBKDF2', false, ['deriveKey']
-  )
-  return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt: salt.buffer as ArrayBuffer, iterations: 100000, hash: 'SHA-256' },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  )
 }
 
 function toBase64 (buffer: ArrayBuffer | Uint8Array): string {
@@ -76,105 +28,136 @@ function fromBase64 (str: string): Uint8Array {
   return bytes
 }
 
-export async function shareCredentials (serverUrl: string, apiKey: string, durationMs: number): Promise<string> {
-  if (!isCredentialSharingAvailable()) throw new Error('Credential sharing is not available on mobile')
-  const pin = generatePin()
+async function deriveKey (pin: string, salt: Uint8Array): Promise<CryptoKey> {
+  const encoder = new TextEncoder()
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', encoder.encode(pin) as BufferSource, 'PBKDF2', false, ['deriveKey']
+  )
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: salt.buffer as ArrayBuffer, iterations: 100000, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  )
+}
+
+async function encrypt (pin: string, plaintext: string): Promise<{ encrypted: string, salt: string, iv: string }> {
   const salt = crypto.getRandomValues(new Uint8Array(16))
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const key = await deriveKey(pin, salt)
-
   const encoder = new TextEncoder()
-  const encrypted = await crypto.subtle.encrypt(
+  const ciphertext = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv: iv.buffer as ArrayBuffer },
     key,
-    encoder.encode(apiKey) as BufferSource
+    encoder.encode(plaintext) as BufferSource
   )
-
-  const blob: HandoffBlob = {
-    serverUrl,
-    encryptedApiKey: toBase64(encrypted),
+  return {
+    encrypted: toBase64(ciphertext),
     salt: toBase64(salt),
-    iv: toBase64(iv),
+    iv: toBase64(iv)
+  }
+}
+
+async function decrypt (pin: string, encrypted: string, salt: string, iv: string): Promise<string | null> {
+  try {
+    const key = await deriveKey(pin, fromBase64(salt))
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: fromBase64(iv).buffer as ArrayBuffer },
+      key,
+      fromBase64(encrypted).buffer as ArrayBuffer
+    )
+    return new TextDecoder().decode(decrypted)
+  } catch {
+    return null // Wrong PIN or corrupt data
+  }
+}
+
+// --- Vault sync method ---
+
+export async function createVaultShare (plugin: ImmichPicker, serverUrl: string, apiKey: string, durationMs: number): Promise<string> {
+  const pin = generatePin()
+  const { encrypted, salt, iv } = await encrypt(pin, apiKey)
+
+  const blob: EncryptedBlob = {
+    serverUrl,
+    encryptedApiKey: encrypted,
+    salt,
+    iv,
     expiresAt: Date.now() + durationMs
   }
 
-  const filename = `${HANDOFF_PREFIX}${Date.now()}.json`
-  const filepath = pathMod!.join(getHandoffDir(), filename)
-  fs!.writeFileSync(filepath, JSON.stringify(blob), 'utf-8')
+  // Store in plugin data — syncs with vault
+  const data = await plugin.loadData() || {}
+  data.sharedCredentials = blob
+  await plugin.saveData(data)
 
   return pin
 }
 
-export async function importCredentials (pin: string): Promise<{ serverUrl: string, apiKey: string } | null> {
-  const files = getHandoffFiles()
+export async function importVaultShare (plugin: ImmichPicker, pin: string): Promise<{ serverUrl: string, apiKey: string } | null> {
+  const data = await plugin.loadData()
+  const blob = data?.sharedCredentials as EncryptedBlob | undefined
+  if (!blob) return null
 
-  for (const filepath of files) {
-    try {
-      const content = fs!.readFileSync(filepath, 'utf-8')
-      const blob: HandoffBlob = JSON.parse(content)
-
-      // Skip expired
-      if (blob.expiresAt < Date.now()) {
-        fs!.unlinkSync(filepath)
-        continue
-      }
-
-      // Try to decrypt
-      const salt = fromBase64(blob.salt)
-      const iv = fromBase64(blob.iv)
-      const encrypted = fromBase64(blob.encryptedApiKey)
-      const key = await deriveKey(pin, salt)
-
-      try {
-        const decrypted = await crypto.subtle.decrypt(
-          { name: 'AES-GCM', iv: iv.buffer as ArrayBuffer },
-          key,
-          encrypted.buffer as ArrayBuffer
-        )
-        const decoder = new TextDecoder()
-        const apiKey = decoder.decode(decrypted)
-
-        // Success — delete the blob
-        fs!.unlinkSync(filepath)
-
-        return { serverUrl: blob.serverUrl, apiKey }
-      } catch {
-        // Wrong PIN for this blob — continue to next
-        continue
-      }
-    } catch {
-      // Corrupt file — skip
-      continue
-    }
+  if (blob.expiresAt < Date.now()) {
+    // Expired — clean up
+    delete data.sharedCredentials
+    await plugin.saveData(data)
+    return null
   }
 
-  return null
+  const apiKey = await decrypt(pin, blob.encryptedApiKey, blob.salt, blob.iv)
+  if (!apiKey) return null
+
+  // Success — clean up shared blob
+  delete data.sharedCredentials
+  await plugin.saveData(data)
+
+  return { serverUrl: blob.serverUrl, apiKey }
 }
 
-export function cleanupExpiredBlobs (): void {
-  const files = getHandoffFiles()
-  for (const filepath of files) {
-    try {
-      const content = fs!.readFileSync(filepath, 'utf-8')
-      const blob: HandoffBlob = JSON.parse(content)
-      if (blob.expiresAt < Date.now()) {
-        fs!.unlinkSync(filepath)
-      }
-    } catch {
-      // Corrupt file — try to clean up
-      try { fs!.unlinkSync(filepath) } catch { /* ignore */ }
-    }
-  }
+export async function hasVaultShare (plugin: ImmichPicker): Promise<boolean> {
+  const data = await plugin.loadData()
+  const blob = data?.sharedCredentials as EncryptedBlob | undefined
+  if (!blob) return false
+  return blob.expiresAt >= Date.now()
 }
 
-export function hasActiveShare (): boolean {
-  const files = getHandoffFiles()
-  for (const filepath of files) {
-    try {
-      const content = fs!.readFileSync(filepath, 'utf-8')
-      const blob: HandoffBlob = JSON.parse(content)
-      if (blob.expiresAt >= Date.now()) return true
-    } catch { /* ignore */ }
+// --- Share string method ---
+
+const SHARE_PREFIX = 'immich-share:'
+
+export async function createShareString (serverUrl: string, apiKey: string, durationMs: number): Promise<{ pin: string, shareString: string }> {
+  const pin = generatePin()
+  const { encrypted, salt, iv } = await encrypt(pin, apiKey)
+
+  const blob: EncryptedBlob = {
+    serverUrl,
+    encryptedApiKey: encrypted,
+    salt,
+    iv,
+    expiresAt: Date.now() + durationMs
   }
-  return false
+
+  const shareString = SHARE_PREFIX + btoa(JSON.stringify(blob))
+  return { pin, shareString }
+}
+
+export async function importShareString (shareString: string, pin: string): Promise<{ serverUrl: string, apiKey: string } | null> {
+  if (!shareString.startsWith(SHARE_PREFIX)) return null
+
+  try {
+    const jsonStr = atob(shareString.slice(SHARE_PREFIX.length))
+    const blob: EncryptedBlob = JSON.parse(jsonStr)
+
+    if (blob.expiresAt < Date.now()) return null
+
+    const apiKey = await decrypt(pin, blob.encryptedApiKey, blob.salt, blob.iv)
+    if (!apiKey) return null
+
+    return { serverUrl: blob.serverUrl, apiKey }
+  } catch {
+    return null
+  }
 }
