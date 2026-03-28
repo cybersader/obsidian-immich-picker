@@ -147,19 +147,26 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
     // Mobile toolbar setup (only shown on mobile)
     if (Platform.isMobile) {
       new Setting(containerEl)
-        .setName('Mobile toolbar')
-        .setDesc('Quick access to insert photos from your toolbar')
+        .setName('Mobile quick access')
+        .setDesc('Ways to quickly insert photos on mobile')
         .addButton(btn => btn
-          .setButtonText('Set up toolbar')
+          .setButtonText('How to set up')
           .onClick(() => {
             const modal = new Modal(this.app)
-            modal.setTitle('Add to mobile toolbar')
+            modal.setTitle('Quick access on mobile')
 
             const content = modal.contentEl
-            content.createEl('p', { text: 'This will open your mobile toolbar settings where you can add the Immich photo picker button.' })
 
-            const stepsLabel = content.createEl('strong')
-            stepsLabel.textContent = 'Steps:'
+            content.createEl('p', { text: 'There are two ways to quickly access the photo picker on mobile:' })
+
+            const ribbonLabel = content.createEl('strong')
+            ribbonLabel.textContent = '1. Menu icon (already set up)'
+            content.createEl('p', { text: 'Tap the \u2261 hamburger menu at the bottom right. The Immich camera icon is already there.' })
+
+            const toolbarLabel = content.createEl('strong')
+            toolbarLabel.textContent = '2. Keyboard toolbar (optional)'
+            content.createEl('p', { text: 'Add the command to the toolbar that appears above your keyboard when editing:' })
+
             const steps = content.createEl('ol')
             // eslint-disable-next-line obsidianmd/ui/sentence-case
             steps.createEl('li', { text: 'Go to Settings > Mobile > Manage toolbar options' })
@@ -167,13 +174,6 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
             steps.createEl('li', { text: 'Search for "Immich"' })
             // eslint-disable-next-line obsidianmd/ui/sentence-case
             steps.createEl('li', { text: 'Select "Insert image from Immich"' })
-
-            content.createEl('p', { text: 'After setup, you can insert photos with one tap from your mobile toolbar.' })
-
-            content.createEl('p', { text: 'Close this dialog, then go to:' })
-            const nav = content.createEl('p')
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            nav.createEl('strong', { text: 'Settings > Mobile > Manage toolbar options' })
 
             const btnRow = content.createDiv({ attr: { style: 'display:flex;gap:8px;margin-top:12px;' } })
             const okBtn = btnRow.createEl('button', { text: 'Got it', cls: 'mod-cta' })
