@@ -109,25 +109,32 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
             if (urlMatch) {
               void replaceImgSrc(plugin, img as HTMLImageElement, urlMatch[1])
               this.addEditButton(view, img as HTMLImageElement)
+              // Hide Obsidian's native edit-block button
+              const embedBlock = img.closest('.cm-embed-block')
+              const nativeBtn = embedBlock?.querySelector('.edit-block-button')
+              if (nativeBtn) nativeBtn.classList.add('immich-hide-native-edit')
             }
           }
         }
       }
 
       addEditButton (view: EditorView, img: HTMLImageElement) {
-        // Don't add if already exists
+        // Don't add if already exists nearby
+        if (img.nextElementSibling?.classList.contains('immich-edit-btn')) return
         if (img.parentElement?.querySelector('.immich-edit-btn')) return
 
-        // Ensure parent is positioned for overlay
-        const parent = img.parentElement
-        if (!parent) return
-        if (getComputedStyle(parent).position === 'static') {
-          parent.addClass('immich-img-wrapper')
+        // Wrap img in a positioned container if not already wrapped
+        let wrapper = img.parentElement
+        if (!wrapper?.classList.contains('immich-img-wrapper')) {
+          wrapper = document.createElement('span')
+          wrapper.className = 'immich-img-wrapper'
+          img.parentElement?.insertBefore(wrapper, img)
+          wrapper.appendChild(img)
         }
 
         const btn = document.createElement('button')
         btn.className = 'immich-edit-btn'
-        btn.textContent = '\u270E' // ✎ pencil
+        btn.innerHTML = '&#x270E;' // ✎ pencil
         btn.title = 'Edit source'
         btn.addEventListener('click', e => {
           e.stopPropagation()
@@ -140,7 +147,7 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
             // Position not found — ignore
           }
         })
-        parent.appendChild(btn)
+        wrapper.appendChild(btn)
       }
 
       scheduleProcess (view: EditorView) {

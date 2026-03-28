@@ -45,8 +45,10 @@
 }
 
 /* Hide Obsidian's native edit-block button on our images */
-.cm-embed-block:has(.immich-remote-image) .edit-block-button {
-  display: none;
+.cm-embed-block:has(.immich-remote-image) .edit-block-button,
+.immich-img-wrapper + .edit-block-button,
+.immich-hide-native-edit {
+  display: none !important;
 }
 
 /* Size selector bubbles */
