@@ -55,6 +55,7 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
   plugin: ImmichPicker
   shareMethod: 'vault' | 'string' = 'vault'
   lastShareResult: { pin: string, shareString: string } | null = null
+  shareResultTimer: number | null = null
 
   constructor (app: App, plugin: ImmichPicker) {
     super(app, plugin)
@@ -591,6 +592,12 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
           } else {
             const result = await createShareString(this.plugin.settings.serverUrl, apiKey, shareDuration)
             this.lastShareResult = result
+            if (this.shareResultTimer) window.clearTimeout(this.shareResultTimer)
+            this.shareResultTimer = window.setTimeout(() => {
+              this.lastShareResult = null
+              this.shareResultTimer = null
+              this.display()
+            }, shareDuration)
             try { await navigator.clipboard.writeText(result.shareString) } catch { /* clipboard may not work on mobile */ }
             new Notice(`PIN: ${result.pin}`, 30000)
             this.display()
