@@ -162,7 +162,7 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
             stepsLabel.textContent = 'Steps:'
             const steps = content.createEl('ol')
             // eslint-disable-next-line obsidianmd/ui/sentence-case
-            steps.createEl('li', { text: 'Tap "Open toolbar settings" below' })
+            steps.createEl('li', { text: 'Go to Settings > Mobile > Manage toolbar options' })
             steps.createEl('li', { text: 'Tap the + button to add a new command' })
             steps.createEl('li', { text: 'Search for "Immich"' })
             // eslint-disable-next-line obsidianmd/ui/sentence-case
@@ -170,17 +170,14 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
 
             content.createEl('p', { text: 'After setup, you can insert photos with one tap from your mobile toolbar.' })
 
+            content.createEl('p', { text: 'Close this dialog, then go to:' })
+            const nav = content.createEl('p')
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            nav.createEl('strong', { text: 'Settings > Mobile > Manage toolbar options' })
+
             const btnRow = content.createDiv({ attr: { style: 'display:flex;gap:8px;margin-top:12px;' } })
-            const openBtn = btnRow.createEl('button', { text: 'Open toolbar settings', cls: 'mod-cta' })
-            openBtn.addEventListener('click', () => {
-              modal.close()
-              const appSetting = (this.app as unknown as { setting: { open(): Promise<void>, openTabById(id: string): void } }).setting
-              void appSetting.open().then(() => {
-                appSetting.openTabById('mobile')
-              })
-            })
-            const cancelBtn = btnRow.createEl('button', { text: 'Cancel' })
-            cancelBtn.addEventListener('click', () => { modal.close() })
+            const okBtn = btnRow.createEl('button', { text: 'Got it', cls: 'mod-cta' })
+            okBtn.addEventListener('click', () => { modal.close() })
 
             modal.open()
           }))
