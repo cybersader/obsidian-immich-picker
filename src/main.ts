@@ -44,6 +44,20 @@ export default class ImmichPicker extends Plugin {
     // Always register post-processor so remote images render in any mode
     registerImmichPostProcessor(this)
 
+    // Ribbon icon — accessible from hamburger menu on mobile
+    this.addRibbonIcon('image-plus', 'Insert image from Immich', () => {
+      if (!this.settings.serverUrl || !this.cachedApiKey) {
+        new Notice('Please configure Immich server URL and API key in settings')
+        return
+      }
+      const view = this.app.workspace.getActiveViewOfType(MarkdownView)
+      if (!view) {
+        new Notice('Open a note first')
+        return
+      }
+      new ImmichPickerModal(this.app, this, view.editor, view).open()
+    })
+
     this.addCommand({
       id: 'insert-immich-photo',
       name: 'Insert image from Immich',
