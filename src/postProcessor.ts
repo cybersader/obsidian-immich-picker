@@ -108,7 +108,7 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
             const urlMatch = src.match(/\/api\/assets\/([a-f0-9-]+)\/thumbnail/i)
             if (urlMatch) {
               void replaceImgSrc(plugin, img as HTMLImageElement, urlMatch[1])
-              this.addEditButton(view, img as HTMLImageElement)
+              this.addEditButton(view, img as HTMLImageElement, urlMatch[1])
               // Hide Obsidian's native edit-block button
               const embedBlock = img.closest('.cm-embed-block')
               const nativeBtn = embedBlock?.querySelector('.edit-block-button')
@@ -118,7 +118,7 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
         }
       }
 
-      addEditButton (view: EditorView, img: HTMLImageElement) {
+      addEditButton (view: EditorView, img: HTMLImageElement, assetId?: string) {
         // Don't add if already exists nearby
         if (img.nextElementSibling?.classList.contains('immich-edit-btn')) return
         if (img.parentElement?.querySelector('.immich-edit-btn')) return
@@ -139,18 +139,17 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
         btn.addEventListener('click', e => {
           e.stopPropagation()
           e.preventDefault()
-          try {
-            // Find the embed block or line containing this image
-            const embedBlock = img.closest('.cm-embed-block, .cm-line')
-            const targetNode = embedBlock || img
-            let pos = view.posAtDOM(targetNode, 0)
-            // Offset by 1 to land inside the markdown (past the `!`)
-            const docLen = view.state.doc.length
-            if (pos < docLen) pos = Math.min(pos + 1, docLen)
-            view.dispatch({ selection: { anchor: pos } })
-            view.focus()
-          } catch {
-            // Position not found — ignore
+          // Search document for the line containing this asset's URL
+          const doc = view.state.doc
+          const searchTerm = assetId || '/api/assets/'
+          for (let i = 1; i <= doc.lines; i++) {
+            const line = doc.line(i)
+            if (line.text.includes(searchTerm)) {
+              // Place cursor at start of this line — triggers source reveal
+              view.dispatch({ selection: { anchor: line.from + 1 } })
+              view.focus()
+              return
+            }
           }
         })
         wrapper.appendChild(btn)
