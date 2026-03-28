@@ -179,6 +179,12 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
             // eslint-disable-next-line obsidianmd/ui/sentence-case
             steps.createEl('li', { text: 'Select "Insert image from Immich"' })
 
+            const tip = content.createEl('p')
+            tip.createEl('small', { text: 'For even more customization (context menus, page headers, etc.), try the ' })
+            const link = tip.createEl('small')
+            link.createEl('a', { text: 'Commander', href: 'obsidian://show-plugin?id=cmdr' })
+            link.appendText(' plugin.')
+
             const btnRow = content.createDiv({ attr: { style: 'display:flex;gap:8px;margin-top:12px;' } })
             const okBtn = btnRow.createEl('button', { text: 'Got it', cls: 'mod-cta' })
             okBtn.addEventListener('click', () => { modal.close() })
