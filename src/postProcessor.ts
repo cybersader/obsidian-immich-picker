@@ -1,4 +1,4 @@
-import { requestUrl } from 'obsidian'
+import { Notice, requestUrl } from 'obsidian'
 import { EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view'
 import ImmichPicker from './main'
 
@@ -140,27 +140,42 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
           e.stopPropagation()
           e.preventDefault()
 
-          // Step 1: Place cursor on the image line to make Obsidian show its edit button
+          // eslint-disable-next-line obsidianmd/ui/sentence-case
+          new Notice('[Debug] Pencil clicked', 3000)
+
+          // Step 1: Place cursor on the image line
           const doc = view.state.doc
           const searchTerm = assetId || '/api/assets/'
+          let found = false
           for (let i = 1; i <= doc.lines; i++) {
             const line = doc.line(i)
             if (line.text.includes(searchTerm)) {
+              // eslint-disable-next-line obsidianmd/ui/sentence-case
+            new Notice(`[Debug] Found line ${i}: ${line.text.substring(0, 40)}...`, 5000)
               view.dispatch({ selection: { anchor: line.from + 1 } })
               view.focus()
+              found = true
               break
             }
+          }
+          if (!found) {
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            new Notice(`[Debug] Asset not found in doc: ${searchTerm}`, 5000)
           }
 
           // Step 2: After a tick, find and click the native edit-block button
           setTimeout(() => {
             const embedBlock = img.closest('.cm-embed-block')
             const nativeBtn = embedBlock?.querySelector('.edit-block-button') as HTMLElement | null
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            new Notice(`[Debug] embedBlock: ${embedBlock ? 'found' : 'null'}, nativeBtn: ${nativeBtn ? 'found' : 'null'}`, 5000)
             if (nativeBtn) {
               nativeBtn.classList.remove('immich-hide-native-edit')
               nativeBtn.click()
+              // eslint-disable-next-line obsidianmd/ui/sentence-case
+              new Notice('[Debug] Clicked native button', 3000)
             }
-          }, 50)
+          }, 100)
         })
         wrapper.appendChild(btn)
       }
