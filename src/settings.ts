@@ -1,4 +1,4 @@
-import { App, moment, Notice, Platform, PluginSettingTab, Setting } from 'obsidian'
+import { App, Modal, moment, Notice, Platform, PluginSettingTab, Setting } from 'obsidian'
 import { FolderSuggest } from './suggesters/FolderSuggester'
 import ImmichPicker from './main'
 import { createVaultShare, importVaultShare, hasVaultShare, createShareString, importShareString } from './credentialSharing'
@@ -148,19 +148,42 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
     if (Platform.isMobile) {
       new Setting(containerEl)
         .setName('Mobile toolbar')
+        .setDesc('Quick access to insert photos from your toolbar')
         .addButton(btn => btn
           .setButtonText('Set up toolbar')
           .onClick(() => {
-            const setting = (this.app as unknown as { setting: { open(): Promise<void>, openTabById(id: string): void } }).setting
-            void setting.open().then(() => {
-              setting.openTabById('mobile')
+            const modal = new Modal(this.app)
+            modal.setTitle('Add to mobile toolbar')
+
+            const content = modal.contentEl
+            content.createEl('p', { text: 'This will open your mobile toolbar settings where you can add the Immich photo picker button.' })
+
+            const stepsLabel = content.createEl('strong')
+            stepsLabel.textContent = 'Steps:'
+            const steps = content.createEl('ol')
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            steps.createEl('li', { text: 'Tap "Open toolbar settings" below' })
+            steps.createEl('li', { text: 'Tap the + button to add a new command' })
+            steps.createEl('li', { text: 'Search for "Immich"' })
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            steps.createEl('li', { text: 'Select "Insert image from Immich"' })
+
+            content.createEl('p', { text: 'After setup, you can insert photos with one tap from your mobile toolbar.' })
+
+            const btnRow = content.createDiv({ attr: { style: 'display:flex;gap:8px;margin-top:12px;' } })
+            const openBtn = btnRow.createEl('button', { text: 'Open toolbar settings', cls: 'mod-cta' })
+            openBtn.addEventListener('click', () => {
+              modal.close()
+              const appSetting = (this.app as unknown as { setting: { open(): Promise<void>, openTabById(id: string): void } }).setting
+              void appSetting.open().then(() => {
+                appSetting.openTabById('mobile')
+              })
             })
-            new Notice('Add "Insert image from Immich" to your toolbar for quick access')
+            const cancelBtn = btnRow.createEl('button', { text: 'Cancel' })
+            cancelBtn.addEventListener('click', () => { modal.close() })
+
+            modal.open()
           }))
-        .then(setting => {
-          setting.descEl.appendText('Add Immich commands to your mobile toolbar for one-tap photo insertion. ')
-          setting.descEl.appendText('This opens the mobile toolbar settings where you can search for and add Immich commands.')
-        })
     }
 
     /*
