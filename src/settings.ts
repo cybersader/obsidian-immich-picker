@@ -1,7 +1,7 @@
 import { App, moment, Notice, PluginSettingTab, Setting } from 'obsidian'
 import { FolderSuggest } from './suggesters/FolderSuggester'
 import ImmichPicker from './main'
-import { shareCredentials, importCredentials } from './credentialSharing'
+import { shareCredentials, importCredentials, isCredentialSharingAvailable } from './credentialSharing'
 
 export type GetDateFromOption = 'none' | 'title' | 'frontmatter';
 export type RemoteFormatOption = 'server-url' | 'code-block';
@@ -525,8 +525,10 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
       })
 
     /*
-     Credential sharing
+     Credential sharing (desktop only)
      */
+
+    if (!isCredentialSharingAvailable()) return
 
     new Setting(containerEl)
       .setName('Credential sharing')
