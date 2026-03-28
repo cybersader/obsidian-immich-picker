@@ -95,12 +95,16 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
         if (!plugin.settings.renderInEditMode) return
 
         const images = view.dom.querySelectorAll('img:not(.immich-remote-image)')
-        const serverUrl = plugin.settings.serverUrl
 
         for (const img of Array.from(images)) {
+          // Skip images in the actively-edited line/block (let Obsidian handle toggle)
+          const parentLine = img.closest('.cm-line, .cm-embed-block')
+          if (parentLine?.classList.contains('cm-active')) continue
+          if (parentLine?.querySelector('.cm-active')) continue
+
           const src = img.getAttribute('src') || ''
 
-          if (serverUrl && src.includes('/api/assets/') && src.includes('/thumbnail')) {
+          if (src.includes('/api/assets/') && src.includes('/thumbnail')) {
             const urlMatch = src.match(/\/api\/assets\/([a-f0-9-]+)\/thumbnail/i)
             if (urlMatch) {
               void replaceImgSrc(plugin, img as HTMLImageElement, urlMatch[1])
@@ -117,7 +121,7 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
       }
 
       update (update: ViewUpdate) {
-        if (update.docChanged || update.viewportChanged) {
+        if (update.docChanged || update.viewportChanged || update.selectionSet) {
           this.scheduleProcess(update.view)
         }
       }
