@@ -139,18 +139,28 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
         btn.addEventListener('click', e => {
           e.stopPropagation()
           e.preventDefault()
-          // Search document for the line containing this asset's URL
+
+          // Step 1: Place cursor on the image line to make Obsidian show its edit button
           const doc = view.state.doc
           const searchTerm = assetId || '/api/assets/'
           for (let i = 1; i <= doc.lines; i++) {
             const line = doc.line(i)
             if (line.text.includes(searchTerm)) {
-              // Place cursor at start of this line — triggers source reveal
               view.dispatch({ selection: { anchor: line.from + 1 } })
               view.focus()
-              return
+              break
             }
           }
+
+          // Step 2: After a tick, find and click the native edit-block button
+          setTimeout(() => {
+            const embedBlock = img.closest('.cm-embed-block')
+            const nativeBtn = embedBlock?.querySelector('.edit-block-button') as HTMLElement | null
+            if (nativeBtn) {
+              nativeBtn.classList.remove('immich-hide-native-edit')
+              nativeBtn.click()
+            }
+          }, 50)
         })
         wrapper.appendChild(btn)
       }
