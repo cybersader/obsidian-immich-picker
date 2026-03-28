@@ -61,6 +61,7 @@ export default class ImmichPicker extends Plugin {
     this.addCommand({
       id: 'insert-immich-photo',
       name: 'Insert image from Immich',
+      icon: 'image-plus',
       editorCallback: (editor: Editor, view: MarkdownView) => {
         if (!this.settings.serverUrl || !this.cachedApiKey) {
           new Notice('Please configure Immich server URL and API key in settings')
@@ -73,6 +74,7 @@ export default class ImmichPicker extends Plugin {
     this.addCommand({
       id: 'debug-enable',
       name: 'Enable debug logging (5 minutes)',
+      icon: 'bug',
       callback: () => {
         if (isDebugEnabled()) {
           disableDebugLog()
@@ -87,6 +89,7 @@ export default class ImmichPicker extends Plugin {
     this.addCommand({
       id: 'debug-show',
       name: 'Show debug logs',
+      icon: 'file-text',
       callback: () => {
         const logs = getDebugLogs()
         if (!logs) {
@@ -119,6 +122,7 @@ export default class ImmichPicker extends Plugin {
     this.addCommand({
       id: 'convert-immich-images',
       name: 'Convert Immich images',
+      icon: 'arrow-right-left',
       callback: () => {
         if (!this.settings.serverUrl) {
           new Notice('Please configure Immich server URL in settings')
@@ -131,6 +135,7 @@ export default class ImmichPicker extends Plugin {
     this.addCommand({
       id: 'convert-remote-format',
       name: 'Convert remote images to current format (current note)',
+      icon: 'refresh-cw',
       editorCallback: async (editor: Editor, view: MarkdownView) => {
         if (!this.settings.serverUrl) {
           new Notice('Please configure Immich server URL in settings')
@@ -143,6 +148,7 @@ export default class ImmichPicker extends Plugin {
     this.addCommand({
       id: 'convert-remote-to-local',
       name: 'Convert remote images to local thumbnails (current note)',
+      icon: 'download',
       editorCallback: async (editor: Editor, view: MarkdownView) => {
         if (!this.settings.serverUrl || !this.cachedApiKey) {
           new Notice('Please configure Immich server URL and API key in settings')

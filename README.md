@@ -1,8 +1,19 @@
-# Obsidian Immich Picker
+<p align="center">
+  <img src="docs/logo.jpg" alt="Obsidian Immich Picker" width="120" />
+</p>
 
-An Obsidian plugin to insert images from a self-hosted [Immich](https://immich.app/) photo server. Browse, search, and embed photos directly into your notes with flexible storage options.
+<h1 align="center">Obsidian Immich Picker</h1>
 
-Adapted from [obsidian-google-photos](https://github.com/alangrainger/obsidian-google-photos) by Alan Grainger.
+<p align="center">
+  Insert images from a self-hosted <a href="https://immich.app/">Immich</a> photo server into your Obsidian notes.<br/>
+  Browse, search, and embed photos with flexible storage options.
+</p>
+
+<p align="center">
+  Adapted from <a href="https://github.com/alangrainger/obsidian-google-photos">obsidian-google-photos</a> by Alan Grainger.
+</p>
+
+---
 
 ![Photo selection modal](docs/screenshot-photos.webp)
 
