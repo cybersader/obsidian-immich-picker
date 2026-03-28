@@ -17,6 +17,7 @@ export interface ImmichPickerSettings {
   imageMode: ImageModeOption;
   remoteFormat: RemoteFormatOption;
   displayWidth: number;
+  renderInEditMode: boolean;
   thumbnailWidth: number;
   thumbnailHeight: number;
   filename: string;
@@ -38,6 +39,7 @@ export const DEFAULT_SETTINGS: ImmichPickerSettings = {
   imageMode: 'local',
   remoteFormat: 'server-url',
   displayWidth: 0,
+  renderInEditMode: true,
   thumbnailWidth: 400,
   thumbnailHeight: 280,
   filename: '[immich_]YYYY-MM-DD--HH-mm-ss[.jpg]',
@@ -280,6 +282,16 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
           setting.descEl.createEl('br')
           setting.descEl.appendText('Use "Convert remote images to current format" command to convert existing notes.')
         })
+
+      new Setting(containerEl)
+        .setName('Render in edit mode')
+        .setDesc('Show images inline while editing. Turn off for standard behavior.')
+        .addToggle(toggle => toggle
+          .setValue(this.plugin.settings.renderInEditMode)
+          .onChange(async value => {
+            this.plugin.settings.renderInEditMode = value
+            await this.plugin.saveSettings()
+          }))
     }
 
     // Display width (shown in all modes)

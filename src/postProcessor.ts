@@ -85,31 +85,22 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
   // Editor extension: handles images in Live Preview (edit mode)
   const immichEditorPlugin = ViewPlugin.fromClass(
     class {
-      observer: MutationObserver
+      debounceTimer: number | null = null
 
       constructor (view: EditorView) {
-        this.observer = new MutationObserver(mutations => {
-          for (const mutation of mutations) {
-            for (const node of Array.from(mutation.addedNodes)) {
-              if (node instanceof HTMLElement) {
-                this.processElement(node)
-              }
-            }
-          }
-        })
-        this.observer.observe(view.dom, { childList: true, subtree: true })
-        // Process any existing images
-        this.processElement(view.dom)
+        this.scheduleProcess(view)
       }
 
-      processElement (el: HTMLElement) {
-        const images = el.querySelectorAll('img:not(.immich-remote-image)')
+      processImages (view: EditorView) {
+        if (!plugin.settings.renderInEditMode) return
+
+        const images = view.dom.querySelectorAll('img:not(.immich-remote-image)')
         const serverUrl = plugin.settings.serverUrl
 
         for (const img of Array.from(images)) {
           const src = img.getAttribute('src') || ''
 
-          if (serverUrl && src.includes(serverUrl) && src.includes('/api/assets/')) {
+          if (serverUrl && src.includes('/api/assets/') && src.includes('/thumbnail')) {
             const urlMatch = src.match(/\/api\/assets\/([a-f0-9-]+)\/thumbnail/i)
             if (urlMatch) {
               void replaceImgSrc(plugin, img as HTMLImageElement, urlMatch[1])
@@ -118,14 +109,21 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
         }
       }
 
+      scheduleProcess (view: EditorView) {
+        if (this.debounceTimer) window.clearTimeout(this.debounceTimer)
+        this.debounceTimer = window.setTimeout(() => {
+          this.processImages(view)
+        }, 150)
+      }
+
       update (update: ViewUpdate) {
         if (update.docChanged || update.viewportChanged) {
-          this.processElement(update.view.dom)
+          this.scheduleProcess(update.view)
         }
       }
 
       destroy () {
-        this.observer.disconnect()
+        if (this.debounceTimer) window.clearTimeout(this.debounceTimer)
       }
     }
   )

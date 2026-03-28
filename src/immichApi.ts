@@ -149,7 +149,8 @@ export class ImmichApi {
   }
 
   getThumbnailUrl (assetId: string): string {
-    return `${this.serverUrl}/api/assets/${assetId}/thumbnail?size=preview`
+    // #.jpg fragment hints to Obsidian's parser that this is an image (doesn't affect HTTP request)
+    return `${this.serverUrl}/api/assets/${assetId}/thumbnail?size=preview#.jpg`
   }
 
   getAssetUrl (assetId: string): string {
