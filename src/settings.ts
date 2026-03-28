@@ -2,6 +2,7 @@ import { App, moment, Notice, PluginSettingTab, Setting } from 'obsidian'
 import { FolderSuggest } from './suggesters/FolderSuggester'
 import ImmichPicker from './main'
 import { createVaultShare, importVaultShare, hasVaultShare, createShareString, importShareString } from './credentialSharing'
+import { debugLog, enableDebugLog, disableDebugLog, getDebugLogs, getDebugLogCount, clearDebugLogs, isDebugEnabled, getTimeRemaining } from './debugLog'
 
 export type GetDateFromOption = 'none' | 'title' | 'frontmatter';
 export type RemoteFormatOption = 'server-url' | 'code-block';
@@ -549,10 +550,17 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
         text: method.label,
         cls: 'immich-share-method-btn' + (this.shareMethod === method.key ? ' is-active' : '')
       })
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', e => {
+        debugLog(`Share method button clicked: ${method.key} (event type: ${e.type}, target: ${(e.target as HTMLElement)?.tagName})`)
         this.shareMethod = method.key
         methodBtnContainer.querySelectorAll('.immich-share-method-btn').forEach(b => b.removeClass('is-active'))
         btn.addClass('is-active')
+        debugLog(`Share method set to: ${this.shareMethod}`)
+      })
+      btn.addEventListener('touchend', e => {
+        debugLog(`Share method touchend: ${method.key}`)
+        e.preventDefault()
+        btn.click()
       })
     }
     methodSetting.descEl.appendText('Vault sync: credentials sync with your vault. Share string: copy manually.')
@@ -672,6 +680,67 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
       } else {
         new Notice('Invalid share string, wrong pin, or expired')
       }
+    })
+
+    /*
+     Debug logging
+     */
+
+    new Setting(containerEl)
+      .setName('Debug logging')
+      .setHeading()
+
+    const debugStatus = containerEl.createDiv({ cls: 'immich-debug-status' })
+    const updateDebugStatus = () => {
+      if (isDebugEnabled()) {
+        debugStatus.setText(`Enabled — ${getDebugLogCount()} entries, ${getTimeRemaining()}s remaining`)
+      } else {
+        debugStatus.setText(getDebugLogCount() > 0 ? `Disabled — ${getDebugLogCount()} entries captured` : 'Disabled')
+      }
+    }
+    updateDebugStatus()
+
+    const debugBtnRow = containerEl.createDiv({ cls: 'immich-debug-buttons' })
+
+    const enableBtn = debugBtnRow.createEl('button', {
+      text: isDebugEnabled() ? 'Logging...' : 'Enable for 5 min',
+      cls: isDebugEnabled() ? 'mod-warning' : ''
+    })
+    enableBtn.addEventListener('click', () => {
+      if (isDebugEnabled()) {
+        disableDebugLog()
+      } else {
+        enableDebugLog()
+      }
+      this.display()
+    })
+
+    const copyBtn = debugBtnRow.createEl('button', { text: 'Show logs' })
+    copyBtn.addEventListener('click', () => {
+      const logText = getDebugLogs()
+      if (!logText) {
+        new Notice('No logs captured')
+        return
+      }
+      // Show in a textarea below
+      let logDisplay = containerEl.querySelector<HTMLTextAreaElement>('.immich-debug-log-display')
+      if (!logDisplay) {
+        logDisplay = containerEl.createEl('textarea', {
+          cls: 'immich-debug-log-display immich-share-textarea',
+          attr: { rows: '10', readonly: '' }
+        })
+      }
+      logDisplay.value = logText
+      logDisplay.scrollTop = logDisplay.scrollHeight
+      try { navigator.clipboard.writeText(logText) } catch { /* mobile */ }
+    })
+
+    const clearBtn = debugBtnRow.createEl('button', { text: 'Clear' })
+    clearBtn.addEventListener('click', () => {
+      clearDebugLogs()
+      updateDebugStatus()
+      const logDisplay = containerEl.querySelector('.immich-debug-log-display')
+      if (logDisplay) logDisplay.remove()
     })
   }
 
