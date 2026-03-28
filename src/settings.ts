@@ -161,29 +161,31 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
 
             const ribbonLabel = content.createEl('strong')
             ribbonLabel.textContent = '1. Menu icon (already set up)'
-            const ribbonDesc = content.createEl('p')
-            ribbonDesc.appendText('Tap the \u2261 hamburger menu at the bottom right. The Immich camera icon is already there. To reorder, go to ')
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            ribbonDesc.createEl('strong').textContent = 'Settings > Appearance > Ribbon menu'
-            ribbonDesc.appendText(' and drag it to your preferred position.')
+            content.createEl('p', { text: 'Tap the \u2261 hamburger menu at the bottom right. The Immich camera icon is already there. To reorder it:' })
+
+            const ribbonBtn = content.createEl('button', { text: 'Open ribbon settings' })
+            ribbonBtn.addEventListener('click', () => {
+              modal.close()
+              const appSetting = (this.app as unknown as { setting: { open(): Promise<void>, openTabById(id: string): void } }).setting
+              void appSetting.open().then(() => { appSetting.openTabById('appearance') })
+            })
 
             const toolbarLabel = content.createEl('strong')
             toolbarLabel.textContent = '2. Keyboard toolbar (optional)'
             content.createEl('p', { text: 'Add the command to the toolbar that appears above your keyboard when editing:' })
 
-            const steps = content.createEl('ol')
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            steps.createEl('li', { text: 'Go to Settings > Toolbar' })
-            steps.createEl('li', { text: 'Tap the + button to add a new command' })
-            steps.createEl('li', { text: 'Search for "Immich"' })
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            steps.createEl('li', { text: 'Select "Insert image from Immich"' })
+            const toolbarBtn = content.createEl('button', { text: 'Open toolbar settings' })
+            toolbarBtn.addEventListener('click', () => {
+              modal.close()
+              const appSetting = (this.app as unknown as { setting: { open(): Promise<void>, openTabById(id: string): void } }).setting
+              void appSetting.open().then(() => { appSetting.openTabById('toolbar') })
+            })
 
             const tip = content.createEl('p')
             tip.createEl('small', { text: 'For even more customization (context menus, page headers, etc.), try the ' })
-            const link = tip.createEl('small')
-            link.createEl('a', { text: 'Commander', href: 'obsidian://show-plugin?id=cmdr' })
-            link.appendText(' plugin.')
+            const tipLink = tip.createEl('small')
+            tipLink.createEl('a', { text: 'Commander', href: 'obsidian://show-plugin?id=cmdr' })
+            tipLink.appendText(' plugin.')
 
             const btnRow = content.createDiv({ attr: { style: 'display:flex;gap:8px;margin-top:12px;' } })
             const okBtn = btnRow.createEl('button', { text: 'Got it', cls: 'mod-cta' })
