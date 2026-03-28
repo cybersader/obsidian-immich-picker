@@ -1,4 +1,4 @@
-import { Editor, MarkdownView, moment, Notice, Plugin, TFile } from 'obsidian'
+import { Editor, MarkdownView, Modal, moment, Notice, Plugin, TFile } from 'obsidian'
 import { ImmichApi } from './immichApi'
 import { ImmichPickerSettingTab, ImmichPickerSettings, DEFAULT_SETTINGS } from './settings'
 import { ImmichPickerModal } from './photoModal'
@@ -6,6 +6,7 @@ import { handlebarParse } from './handlebars'
 import { registerImmichPostProcessor, clearImmichBlobCache } from './postProcessor'
 import { ConversionModal } from './conversionModal'
 import { hasVaultShare } from './credentialSharing'
+import { enableDebugLog, isDebugEnabled, disableDebugLog, getDebugLogs, clearDebugLogs } from './debugLog'
 
 // No placeholder needed — remote mode uses code block syntax rendered by code block processor
 
@@ -52,6 +53,52 @@ export default class ImmichPicker extends Plugin {
           return
         }
         new ImmichPickerModal(this.app, this, editor, view).open()
+      }
+    })
+
+    this.addCommand({
+      id: 'debug-enable',
+      name: 'Enable debug logging (5 minutes)',
+      callback: () => {
+        if (isDebugEnabled()) {
+          disableDebugLog()
+          new Notice('Debug logging disabled')
+        } else {
+          enableDebugLog()
+          new Notice('Debug logging enabled for 5 minutes')
+        }
+      }
+    })
+
+    this.addCommand({
+      id: 'debug-show',
+      name: 'Show debug logs',
+      callback: () => {
+        const logs = getDebugLogs()
+        if (!logs) {
+          new Notice('No debug logs captured. Enable debug logging first.')
+          return
+        }
+        const modal = new Modal(this.app)
+        modal.setTitle('Debug logs')
+        const textarea = modal.contentEl.createEl('textarea', {
+          attr: { rows: '20', readonly: '', style: 'width:100%;font-family:monospace;font-size:12px;' }
+        })
+        textarea.value = logs
+        const btnRow = modal.contentEl.createDiv({ attr: { style: 'display:flex;gap:8px;margin-top:8px;' } })
+        const copyBtn = btnRow.createEl('button', { text: 'Copy to clipboard' })
+        copyBtn.addEventListener('click', () => {
+          try { navigator.clipboard.writeText(logs) } catch { /* mobile */ }
+          textarea.select()
+          new Notice('Copied!')
+        })
+        const clearBtn = btnRow.createEl('button', { text: 'Clear logs' })
+        clearBtn.addEventListener('click', () => {
+          clearDebugLogs()
+          textarea.value = ''
+          new Notice('Logs cleared')
+        })
+        modal.open()
       }
     })
 

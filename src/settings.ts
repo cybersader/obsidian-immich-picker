@@ -2,7 +2,7 @@ import { App, moment, Notice, PluginSettingTab, Setting } from 'obsidian'
 import { FolderSuggest } from './suggesters/FolderSuggester'
 import ImmichPicker from './main'
 import { createVaultShare, importVaultShare, hasVaultShare, createShareString, importShareString } from './credentialSharing'
-import { debugLog, enableDebugLog, disableDebugLog, getDebugLogs, getDebugLogCount, clearDebugLogs, isDebugEnabled, getTimeRemaining } from './debugLog'
+import { debugLog } from './debugLog'
 
 export type GetDateFromOption = 'none' | 'title' | 'frontmatter';
 export type RemoteFormatOption = 'server-url' | 'code-block';
@@ -682,66 +682,6 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
       }
     })
 
-    /*
-     Debug logging
-     */
-
-    new Setting(containerEl)
-      .setName('Debug logging')
-      .setHeading()
-
-    const debugStatus = containerEl.createDiv({ cls: 'immich-debug-status' })
-    const updateDebugStatus = () => {
-      if (isDebugEnabled()) {
-        debugStatus.setText(`Enabled — ${getDebugLogCount()} entries, ${getTimeRemaining()}s remaining`)
-      } else {
-        debugStatus.setText(getDebugLogCount() > 0 ? `Disabled — ${getDebugLogCount()} entries captured` : 'Disabled')
-      }
-    }
-    updateDebugStatus()
-
-    const debugBtnRow = containerEl.createDiv({ cls: 'immich-debug-buttons' })
-
-    const enableBtn = debugBtnRow.createEl('button', {
-      text: isDebugEnabled() ? 'Logging...' : 'Enable for 5 min',
-      cls: isDebugEnabled() ? 'mod-warning' : ''
-    })
-    enableBtn.addEventListener('click', () => {
-      if (isDebugEnabled()) {
-        disableDebugLog()
-      } else {
-        enableDebugLog()
-      }
-      this.display()
-    })
-
-    const copyBtn = debugBtnRow.createEl('button', { text: 'Show logs' })
-    copyBtn.addEventListener('click', () => {
-      const logText = getDebugLogs()
-      if (!logText) {
-        new Notice('No logs captured')
-        return
-      }
-      // Show in a textarea below
-      let logDisplay = containerEl.querySelector<HTMLTextAreaElement>('.immich-debug-log-display')
-      if (!logDisplay) {
-        logDisplay = containerEl.createEl('textarea', {
-          cls: 'immich-debug-log-display immich-share-textarea',
-          attr: { rows: '10', readonly: '' }
-        })
-      }
-      logDisplay.value = logText
-      logDisplay.scrollTop = logDisplay.scrollHeight
-      try { navigator.clipboard.writeText(logText) } catch { /* mobile */ }
-    })
-
-    const clearBtn = debugBtnRow.createEl('button', { text: 'Clear' })
-    clearBtn.addEventListener('click', () => {
-      clearDebugLogs()
-      updateDebugStatus()
-      const logDisplay = containerEl.querySelector('.immich-debug-log-display')
-      if (logDisplay) logDisplay.remove()
-    })
   }
 
   updateFilenamePreview (el: HTMLElement, format: string): void {
