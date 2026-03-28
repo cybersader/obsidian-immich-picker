@@ -52,6 +52,7 @@ export const DEFAULT_SETTINGS: ImmichPickerSettings = {
 
 export class ImmichPickerSettingTab extends PluginSettingTab {
   plugin: ImmichPicker
+  shareMethod: 'vault' | 'string' = 'vault'
 
   constructor (app: App, plugin: ImmichPicker) {
     super(app, plugin)
@@ -533,7 +534,6 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
       .setHeading()
       .setDesc('Share credentials with other vaults or devices.')
 
-    let shareMethod: 'vault' | 'string' = 'vault'
     let shareDuration = 300000
 
     new Setting(containerEl)
@@ -542,10 +542,9 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
         dropdown
           .addOption('vault', 'Vault sync')
           .addOption('string', 'Share string')
-          .setValue(shareMethod)
+          .setValue(this.shareMethod)
           .onChange(value => {
-            shareMethod = value as 'vault' | 'string'
-            this.display()
+            this.shareMethod = value as 'vault' | 'string'
           })
       })
       .then(setting => {
@@ -574,7 +573,7 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
             new Notice('Configure server and credentials first')
             return
           }
-          if (shareMethod === 'vault') {
+          if (this.shareMethod === 'vault') {
             const pin = await createVaultShare(this.plugin, this.plugin.settings.serverUrl, apiKey, shareDuration)
             new Notice(`Sharing via vault sync! PIN: ${pin}`, 30000)
           } else {
