@@ -8,6 +8,47 @@
   max-width: 100%;
 }
 
+/* Edit mode: image wrapper for overlay positioning */
+.immich-img-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+/* Edit mode: custom edit/source toggle button */
+.immich-edit-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 1;
+}
+
+.immich-img-wrapper:hover .immich-edit-btn {
+  opacity: 1;
+}
+
+.immich-edit-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+/* Hide Obsidian's native edit-block button on our images */
+.cm-embed-block:has(.immich-remote-image) .edit-block-button {
+  display: none;
+}
+
 /* Size selector bubbles */
 .immich-picker-size-row {
   display: flex;

@@ -108,9 +108,39 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
             const urlMatch = src.match(/\/api\/assets\/([a-f0-9-]+)\/thumbnail/i)
             if (urlMatch) {
               void replaceImgSrc(plugin, img as HTMLImageElement, urlMatch[1])
+              this.addEditButton(view, img as HTMLImageElement)
             }
           }
         }
+      }
+
+      addEditButton (view: EditorView, img: HTMLImageElement) {
+        // Don't add if already exists
+        if (img.parentElement?.querySelector('.immich-edit-btn')) return
+
+        // Ensure parent is positioned for overlay
+        const parent = img.parentElement
+        if (!parent) return
+        if (getComputedStyle(parent).position === 'static') {
+          parent.addClass('immich-img-wrapper')
+        }
+
+        const btn = document.createElement('button')
+        btn.className = 'immich-edit-btn'
+        btn.textContent = '\u270E' // ✎ pencil
+        btn.title = 'Edit source'
+        btn.addEventListener('click', e => {
+          e.stopPropagation()
+          e.preventDefault()
+          try {
+            const pos = view.posAtDOM(img)
+            view.dispatch({ selection: { anchor: pos } })
+            view.focus()
+          } catch {
+            // Position not found — ignore
+          }
+        })
+        parent.appendChild(btn)
       }
 
       scheduleProcess (view: EditorView) {
