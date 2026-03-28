@@ -1,4 +1,4 @@
-import { App, moment, Notice, PluginSettingTab, Setting } from 'obsidian'
+import { App, moment, Notice, Platform, PluginSettingTab, Setting } from 'obsidian'
 import { FolderSuggest } from './suggesters/FolderSuggester'
 import ImmichPicker from './main'
 import { createVaultShare, importVaultShare, hasVaultShare, createShareString, importShareString } from './credentialSharing'
@@ -143,6 +143,25 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
             new Notice('Connection failed: ' + (e as Error).message)
           }
         }))
+
+    // Mobile toolbar setup (only shown on mobile)
+    if (Platform.isMobile) {
+      new Setting(containerEl)
+        .setName('Mobile toolbar')
+        .addButton(btn => btn
+          .setButtonText('Set up toolbar')
+          .onClick(() => {
+            const setting = (this.app as unknown as { setting: { open(): Promise<void>, openTabById(id: string): void } }).setting
+            void setting.open().then(() => {
+              setting.openTabById('mobile')
+            })
+            new Notice('Add "Insert image from Immich" to your toolbar for quick access')
+          }))
+        .then(setting => {
+          setting.descEl.appendText('Add Immich commands to your mobile toolbar for one-tap photo insertion. ')
+          setting.descEl.appendText('This opens the mobile toolbar settings where you can search for and add Immich commands.')
+        })
+    }
 
     /*
      Photo picker settings
