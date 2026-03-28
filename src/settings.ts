@@ -173,7 +173,7 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
 
             const steps = content.createEl('ol')
             // eslint-disable-next-line obsidianmd/ui/sentence-case
-            steps.createEl('li', { text: 'Go to Settings > Mobile > Manage toolbar options' })
+            steps.createEl('li', { text: 'Go to Settings > Toolbar' })
             steps.createEl('li', { text: 'Tap the + button to add a new command' })
             steps.createEl('li', { text: 'Search for "Immich"' })
             // eslint-disable-next-line obsidianmd/ui/sentence-case
