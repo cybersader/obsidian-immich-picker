@@ -140,7 +140,13 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
           e.stopPropagation()
           e.preventDefault()
           try {
-            const pos = view.posAtDOM(img)
+            // Find the embed block or line containing this image
+            const embedBlock = img.closest('.cm-embed-block, .cm-line')
+            const targetNode = embedBlock || img
+            let pos = view.posAtDOM(targetNode, 0)
+            // Offset by 1 to land inside the markdown (past the `!`)
+            const docLen = view.state.doc.length
+            if (pos < docLen) pos = Math.min(pos + 1, docLen)
             view.dispatch({ selection: { anchor: pos } })
             view.focus()
           } catch {
@@ -160,6 +166,14 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
       update (update: ViewUpdate) {
         if (update.docChanged || update.viewportChanged || update.selectionSet) {
           this.scheduleProcess(update.view)
+        }
+        // Continuously hide native edit buttons on our images (Obsidian re-creates them)
+        const nativeBtns = update.view.dom.querySelectorAll('.cm-embed-block .edit-block-button')
+        for (const btn of Array.from(nativeBtns)) {
+          const block = btn.closest('.cm-embed-block')
+          if (block?.querySelector('.immich-remote-image')) {
+            (btn as HTMLElement).classList.add('immich-hide-native-edit')
+          }
         }
       }
 
