@@ -157,32 +157,27 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
 
             const content = modal.contentEl
 
-            content.createEl('p', { text: 'There are two ways to quickly access the photo picker on mobile:' })
+            content.createEl('p', { text: 'Two ways to quickly insert photos on mobile:' })
 
-            const ribbonLabel = content.createEl('strong')
-            ribbonLabel.textContent = '1. Menu icon (already set up)'
-            content.createEl('p', { text: 'Tap the \u2261 hamburger menu at the bottom right. The Immich camera icon is already there. To reorder it:' })
+            content.createEl('strong').textContent = '1. Menu icon (already set up)'
+            const ribbon1 = content.createEl('p')
+            ribbon1.appendText('Tap the \u2261 menu at the bottom right \u2014 the Immich camera icon is already there.')
+            const ribbon2 = content.createEl('p')
+            ribbon2.appendText('To reorder: ')
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            ribbon2.createEl('strong').textContent = 'Settings \u2192 Appearance \u2192 Ribbon menu'
 
-            const ribbonBtn = content.createEl('button', { text: 'Open ribbon settings' })
-            ribbonBtn.addEventListener('click', () => {
-              modal.close()
-              const appSetting = (this.app as unknown as { setting: { open(): Promise<void>, openTabById(id: string): void } }).setting
-              void appSetting.open().then(() => { appSetting.openTabById('appearance') })
-            })
-
-            const toolbarLabel = content.createEl('strong')
-            toolbarLabel.textContent = '2. Keyboard toolbar (optional)'
-            content.createEl('p', { text: 'Add the command to the toolbar that appears above your keyboard when editing:' })
-
-            const toolbarBtn = content.createEl('button', { text: 'Open toolbar settings' })
-            toolbarBtn.addEventListener('click', () => {
-              modal.close()
-              const appSetting = (this.app as unknown as { setting: { open(): Promise<void>, openTabById(id: string): void } }).setting
-              void appSetting.open().then(() => { appSetting.openTabById('toolbar') })
-            })
+            content.createEl('strong').textContent = '2. Keyboard toolbar (optional)'
+            const toolbar1 = content.createEl('p')
+            toolbar1.appendText('Add the command to the bar above your keyboard when editing:')
+            const toolbar2 = content.createEl('p')
+            toolbar2.appendText('Go to ')
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            toolbar2.createEl('strong').textContent = 'Settings \u2192 Toolbar'
+            toolbar2.appendText(', tap +, search "Immich"')
 
             const tip = content.createEl('p')
-            tip.createEl('small', { text: 'For even more customization (context menus, page headers, etc.), try the ' })
+            tip.createEl('small', { text: 'For more customization, try the ' })
             const tipLink = tip.createEl('small')
             tipLink.createEl('a', { text: 'Commander', href: 'obsidian://show-plugin?id=cmdr' })
             tipLink.appendText(' plugin.')
