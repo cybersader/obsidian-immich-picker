@@ -53,6 +53,7 @@ export const DEFAULT_SETTINGS: ImmichPickerSettings = {
 export class ImmichPickerSettingTab extends PluginSettingTab {
   plugin: ImmichPicker
   shareMethod: 'vault' | 'string' = 'vault'
+  lastShareResult: { pin: string, shareString: string } | null = null
 
   constructor (app: App, plugin: ImmichPicker) {
     super(app, plugin)
@@ -577,13 +578,26 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
             const pin = await createVaultShare(this.plugin, this.plugin.settings.serverUrl, apiKey, shareDuration)
             new Notice(`Sharing via vault sync! PIN: ${pin}`, 30000)
           } else {
-            const { pin, shareString } = await createShareString(this.plugin.settings.serverUrl, apiKey, shareDuration)
-            navigator.clipboard.writeText(shareString)
-            new Notice(`PIN: ${pin} — Share string copied to clipboard!`, 30000)
-            // Show the string in a textarea for manual copy
+            const result = await createShareString(this.plugin.settings.serverUrl, apiKey, shareDuration)
+            this.lastShareResult = result
+            try { await navigator.clipboard.writeText(result.shareString) } catch { /* clipboard may not work on mobile */ }
+            new Notice(`PIN: ${result.pin}`, 30000)
             this.display()
           }
         }))
+
+    // Show last share result if available
+    if (this.lastShareResult) {
+      const resultContainer = containerEl.createDiv({ cls: 'immich-share-result' })
+      resultContainer.createEl('p', { text: `PIN: ${this.lastShareResult.pin}`, cls: 'immich-share-pin-display' })
+      const resultTextarea = resultContainer.createEl('textarea', {
+        cls: 'immich-share-textarea',
+        attr: { rows: '3', readonly: '' }
+      })
+      resultTextarea.value = this.lastShareResult.shareString
+      resultTextarea.addEventListener('click', () => { resultTextarea.select() })
+      resultContainer.createEl('small', { text: 'Tap the text above to select, then copy. Share the string and pin separately.' })
+    }
 
     // Vault sync import — show if shared creds detected
     void hasVaultShare(this.plugin).then(available => {

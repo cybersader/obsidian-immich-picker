@@ -218,6 +218,30 @@
   letter-spacing: 4px;
 }
 
+.immich-share-result {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  margin: 4px 0 8px;
+  border-radius: 6px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.immich-share-pin-display {
+  font-size: var(--font-ui-large);
+  font-weight: bold;
+  letter-spacing: 6px;
+  text-align: center;
+  margin: 4px 0;
+}
+
+.immich-share-result small {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
 /* Search */
 .immich-picker-search {
   display: flex;
