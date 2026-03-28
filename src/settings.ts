@@ -620,32 +620,43 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
     // Share string import — always visible
     new Setting(containerEl)
       .setName('Import from share string')
-      .setDesc('Paste a share string and enter the pin')
-      .addTextArea(text => text.setPlaceholder('Paste share string here'))
-      .addText(text => text.setPlaceholder('Pin'))
-      .addButton(btn => btn
-        .setButtonText('Import')
-        .onClick(async () => {
-          const settingEl = btn.buttonEl.closest('.setting-item')
-          const textarea = settingEl?.querySelector('textarea')
-          const pinInput = settingEl?.querySelector<HTMLInputElement>('input[placeholder="Pin"]')
-          const str = textarea?.value?.trim()
-          const pin = pinInput?.value?.trim()
-          if (!str || !pin || pin.length !== 4) {
-            new Notice('Paste the share string and enter the 4-digit pin')
-            return
-          }
-          const result = await importShareString(str, pin)
-          if (result) {
-            await this.plugin.setApiKey(result.apiKey)
-            this.plugin.settings.serverUrl = result.serverUrl
-            await this.plugin.saveSettings()
-            new Notice('Credentials imported!')
-            this.display()
-          } else {
-            new Notice('Invalid share string, wrong pin, or expired')
-          }
-        }))
+      .setHeading()
+
+    const importContainer = containerEl.createDiv({ cls: 'immich-share-import' })
+
+    const shareTextarea = importContainer.createEl('textarea', {
+      cls: 'immich-share-textarea',
+      attr: { placeholder: 'Paste share string here', rows: '3' }
+    })
+
+    const importRow = importContainer.createDiv({ cls: 'immich-share-import-row' })
+    const pinInput = importRow.createEl('input', {
+      cls: 'immich-share-pin',
+      type: 'text',
+      attr: { placeholder: '4-digit pin', maxlength: '4' }
+    })
+    const importBtn = importRow.createEl('button', {
+      text: 'Import',
+      cls: 'mod-cta'
+    })
+    importBtn.addEventListener('click', async () => {
+      const str = shareTextarea.value?.trim()
+      const pin = pinInput.value?.trim()
+      if (!str || !pin || pin.length !== 4) {
+        new Notice('Paste the share string and enter the 4-digit pin')
+        return
+      }
+      const result = await importShareString(str, pin)
+      if (result) {
+        await this.plugin.setApiKey(result.apiKey)
+        this.plugin.settings.serverUrl = result.serverUrl
+        await this.plugin.saveSettings()
+        new Notice('Credentials imported!')
+        this.display()
+      } else {
+        new Notice('Invalid share string, wrong pin, or expired')
+      }
+    })
   }
 
   updateFilenamePreview (el: HTMLElement, format: string): void {

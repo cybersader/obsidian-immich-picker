@@ -179,6 +179,45 @@
   transform: scale(0.98);
 }
 
+/* Credential sharing import */
+.immich-share-import {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.immich-share-textarea {
+  width: 100%;
+  min-height: 60px;
+  resize: vertical;
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.immich-share-import-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.immich-share-pin {
+  width: 100px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: var(--font-ui-medium);
+  text-align: center;
+  letter-spacing: 4px;
+}
+
 /* Search */
 .immich-picker-search {
   display: flex;
