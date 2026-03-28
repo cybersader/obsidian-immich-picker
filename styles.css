@@ -218,6 +218,27 @@
   letter-spacing: 4px;
 }
 
+.immich-share-method-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.immich-share-method-btn {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+  background: var(--background-modifier-hover);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+}
+
+.immich-share-method-btn.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
 .immich-share-result {
   display: flex;
   flex-direction: column;

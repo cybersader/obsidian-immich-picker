@@ -537,22 +537,25 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
 
     let shareDuration = 300000
 
-    new Setting(containerEl)
+    const methodSetting = new Setting(containerEl)
       .setName('Sharing method')
-      .addDropdown(dropdown => {
-        dropdown
-          .addOption('vault', 'Vault sync')
-          .addOption('string', 'Share string')
-          .setValue(this.shareMethod)
-          .onChange(value => {
-            this.shareMethod = value as 'vault' | 'string'
-          })
+    const methodBtnContainer = methodSetting.controlEl.createDiv({ cls: 'immich-share-method-btns' })
+    const methods = [
+      { key: 'vault' as const, label: 'Vault sync' },
+      { key: 'string' as const, label: 'Share string' }
+    ]
+    for (const method of methods) {
+      const btn = methodBtnContainer.createEl('button', {
+        text: method.label,
+        cls: 'immich-share-method-btn' + (this.shareMethod === method.key ? ' is-active' : '')
       })
-      .then(setting => {
-        setting.descEl.appendText('Vault sync: credentials sync with your vault automatically.')
-        setting.descEl.createEl('br')
-        setting.descEl.appendText('Share string: copy an encrypted string to share manually.')
+      btn.addEventListener('click', () => {
+        this.shareMethod = method.key
+        methodBtnContainer.querySelectorAll('.immich-share-method-btn').forEach(b => b.removeClass('is-active'))
+        btn.addClass('is-active')
       })
+    }
+    methodSetting.descEl.appendText('Vault sync: credentials sync with your vault. Share string: copy manually.')
 
     new Setting(containerEl)
       .setName('Duration')
