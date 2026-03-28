@@ -161,7 +161,11 @@ export class ImmichPickerSettingTab extends PluginSettingTab {
 
             const ribbonLabel = content.createEl('strong')
             ribbonLabel.textContent = '1. Menu icon (already set up)'
-            content.createEl('p', { text: 'Tap the \u2261 hamburger menu at the bottom right. The Immich camera icon is already there.' })
+            const ribbonDesc = content.createEl('p')
+            ribbonDesc.appendText('Tap the \u2261 hamburger menu at the bottom right. The Immich camera icon is already there. To reorder, go to ')
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            ribbonDesc.createEl('strong').textContent = 'Settings > Appearance > Ribbon menu'
+            ribbonDesc.appendText(' and drag it to your preferred position.')
 
             const toolbarLabel = content.createEl('strong')
             toolbarLabel.textContent = '2. Keyboard toolbar (optional)'
