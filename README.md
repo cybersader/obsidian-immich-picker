@@ -155,6 +155,15 @@ Quick single-note commands are also available:
 - **Convert remote images to current format** (current note)
 - **Convert remote images to local thumbnails** (current note)
 
+### Mobile
+
+All features work on mobile. For quick access, add commands to your mobile toolbar:
+
+1. Go to **Settings > Mobile > Manage toolbar buttons**
+2. Add "Insert image from Immich" for one-tap photo insertion
+
+The [Commander](https://github.com/phibr0/obsidian-commander) plugin can also add Immich commands to the ribbon, context menus, and page headers.
+
 ## Settings
 
 | Setting | Description | Default |
