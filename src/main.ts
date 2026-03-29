@@ -1,4 +1,4 @@
-import { Editor, MarkdownView, Modal, moment, Notice, Plugin, TFile } from 'obsidian'
+import { Editor, MarkdownView, Menu, Modal, moment, Notice, Plugin, TFile } from 'obsidian'
 import { ImmichApi } from './immichApi'
 import { ImmichPickerSettingTab, ImmichPickerSettings, DEFAULT_SETTINGS } from './settings'
 import { ImmichPickerModal } from './photoModal'
@@ -44,62 +44,117 @@ export default class ImmichPicker extends Plugin {
     // Always register post-processor so remote images render in any mode
     registerImmichPostProcessor(this)
 
-    // Context menu: right-click on Immich images in Live Preview
-    this.registerEvent(
-      this.app.workspace.on('editor-menu', (menu, editor, view) => {
-        // Check if the note contains Immich images
-        const content = editor.getValue()
-        const assetMatch = content.match(/\/api\/assets\/([a-f0-9-]+)\/thumbnail/i)
-        if (!assetMatch) return
-        const assetId = assetMatch[1]
+    // Context menu: right-click/long-press on Immich images
+    // Uses DOM contextmenu with Obsidian's Menu API (same pattern as obsidian-copy-url-in-preview)
+    this.registerDomEvent(document, 'contextmenu', e => {
+      const target = e.target as HTMLElement
+      const img = target.closest('img') || target.querySelector('img')
+      if (!img) return
 
-        // Find the line containing this image
-        let imageLine = -1
-        const lines = content.split('\n')
-        for (let i = 0; i < lines.length; i++) {
-          if (lines[i].includes(assetId)) {
-            imageLine = i
-            break
-          }
+      const hasImmichClass = img.classList.contains('immich-remote-image')
+      const src = img.getAttribute('src') || ''
+      if (!hasImmichClass && !src.includes('/api/assets/')) return
+
+      e.preventDefault()
+      e.stopPropagation()
+
+      const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView)
+      if (!markdownView) return
+      const editor = markdownView.editor
+      const content = editor.getValue()
+
+      // Find all Immich image lines and pick the right one
+      const lines = content.split('\n')
+      let imageLine = -1
+      let assetId = ''
+      for (let i = 0; i < lines.length; i++) {
+        const match = lines[i].match(/\/api\/assets\/([a-f0-9-]+)\/thumbnail/i)
+        if (match) {
+          imageLine = i
+          assetId = match[1]
+          break
         }
+      }
+      if (!assetId) return
 
-        menu.addItem(item => {
-          item.setTitle('Edit image source')
-          item.setIcon('pencil')
-          item.onClick(() => {
-            // Switch to source mode and position cursor
-            const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView)
-            if (!markdownView) return
-            const state = markdownView.getState()
-            state.source = true
-            void markdownView.setState(state, { history: false }).then(() => {
-              if (imageLine >= 0) {
-                editor.setCursor({ line: imageLine, ch: 0 })
-                editor.focus()
+      const immichMenu = new Menu()
+
+      // Obsidian-native equivalents
+      immichMenu.addItem(item => {
+        item.setTitle('Copy image')
+          .setIcon('copy')
+          .onClick(async () => {
+            try {
+              const imgEl = img as HTMLImageElement
+              const canvas = document.createElement('canvas')
+              canvas.width = imgEl.naturalWidth
+              canvas.height = imgEl.naturalHeight
+              const ctx = canvas.getContext('2d')
+              if (ctx) {
+                ctx.drawImage(imgEl, 0, 0)
+                canvas.toBlob(async blob => {
+                  if (blob) {
+                    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+                    new Notice('Image copied')
+                  }
+                })
               }
-            })
+            } catch {
+              new Notice('Failed to copy image')
+            }
           })
-        })
+      })
 
-        menu.addItem(item => {
-          item.setTitle('Open in Immich')
-          item.setIcon('external-link')
-          item.onClick(() => {
+      immichMenu.addItem(item => {
+        item.setTitle('Reset size')
+          .setIcon('maximize')
+          .onClick(() => {
+            if (imageLine >= 0) {
+              // Remove |WIDTH from the markdown
+              const line = lines[imageLine]
+              const resized = line.replace(/\|\d+/, '')
+              editor.replaceRange(resized, { line: imageLine, ch: 0 }, { line: imageLine, ch: line.length })
+            }
+          })
+      })
+
+      immichMenu.addSeparator()
+
+      // Immich-specific items
+      immichMenu.addItem(item => {
+        item.setTitle('Edit image source')
+          .setIcon('pencil')
+          .onClick(() => {
+            if (imageLine >= 0) {
+              editor.setCursor({ line: imageLine, ch: 2 })
+              editor.focus()
+            }
+          })
+      })
+
+      immichMenu.addItem(item => {
+        item.setTitle('Open in Immich')
+          .setIcon('external-link')
+          .onClick(() => {
             window.open(this.immichApi.getAssetUrl(assetId), '_blank')
           })
-        })
+      })
 
-        menu.addItem(item => {
-          item.setTitle('Delete image')
-          item.setIcon('trash')
-          item.onClick(() => {
+      immichMenu.addSeparator()
+
+      immichMenu.addItem(item => {
+        item.setTitle('Delete image')
+          .setIcon('trash')
+          .setWarning(true)
+          .onClick(() => {
             if (imageLine >= 0) {
               editor.replaceRange('', { line: imageLine, ch: 0 }, { line: imageLine + 1, ch: 0 })
             }
           })
-        })
       })
-    )
+
+      immichMenu.showAtMouseEvent(e)
+    }, true)
 
     // Ribbon icon — accessible from hamburger menu on mobile
     this.addRibbonIcon('image-plus', 'Insert image from Immich', () => {
