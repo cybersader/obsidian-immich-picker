@@ -1,10 +1,9 @@
-import { Notice, requestUrl } from 'obsidian'
+import { requestUrl } from 'obsidian'
 import { EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view'
 import ImmichPicker from './main'
 
 // Module-level cache: assetId -> blob URL
 const blobCache = new Map<string, string>()
-// Track in-flight fetches to avoid duplicate requests
 const pendingFetches = new Map<string, Promise<string>>()
 
 export function clearImmichBlobCache (): void {
@@ -16,7 +15,7 @@ export function clearImmichBlobCache (): void {
 }
 
 export function registerImmichPostProcessor (plugin: ImmichPicker): void {
-  // Code block processor: renders ```immich\nUUID\nwidth=400\n``` as images
+  // Code block processor: renders ```immich\nUUID\n``` as images
   plugin.registerMarkdownCodeBlockProcessor('immich', async (source, el) => {
     const lines = source.trim().split('\n')
     let assetId = ''
@@ -39,19 +38,17 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
     }
   })
 
-  // Post-processor: handles server-url, html-tag, and legacy formats
+  // Post-processor: handles Reading View
   plugin.registerMarkdownPostProcessor(async (el: HTMLElement) => {
     const images = el.querySelectorAll('img')
     const serverUrl = plugin.settings.serverUrl
 
     for (const img of Array.from(images)) {
-      // Already processed
       if (img.hasClass('immich-remote-image')) continue
 
       const src = img.getAttribute('src') || ''
       const alt = img.getAttribute('alt') || ''
 
-      // Format: server-url — src contains Immich server thumbnail URL
       if (serverUrl && src.includes(serverUrl) && src.includes('/api/assets/')) {
         const urlMatch = src.match(/\/api\/assets\/([a-f0-9-]+)\/thumbnail/i)
         if (urlMatch) {
@@ -60,21 +57,18 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
         }
       }
 
-      // Format: html-tag — data-immich-id attribute
       const dataId = img.getAttribute('data-immich-id')
       if (dataId && dataId.match(/^[a-f0-9-]+$/i)) {
         await replaceImgSrc(plugin, img, dataId)
         continue
       }
 
-      // Legacy: alt text marker (immich:UUID)
       const altMatch = alt.match(/^immich:([a-f0-9-]+)$/i)
       if (altMatch) {
         await replaceImgSrc(plugin, img, altMatch[1])
         continue
       }
 
-      // Legacy: immich://UUID in src
       const srcMatch = src.match(/immich:\/\/([a-f0-9-]+)/i)
       if (srcMatch) {
         await replaceImgSrc(plugin, img, srcMatch[1])
@@ -82,133 +76,55 @@ export function registerImmichPostProcessor (plugin: ImmichPicker): void {
     }
   })
 
-  // Editor extension: handles images in Live Preview (edit mode)
-  const immichEditorPlugin = ViewPlugin.fromClass(
-    class {
-      debounceTimer: number | null = null
+  // Live Preview: ViewPlugin that replaces img src with authenticated blob URLs
+  // Obsidian's native renderer creates .image-embed — we just authenticate the image
+  if (plugin.settings.renderInEditMode) {
+    const livePreviewPlugin = ViewPlugin.fromClass(
+      class {
+        debounceTimer: number | null = null
 
-      constructor (view: EditorView) {
-        this.scheduleProcess(view)
-      }
+        constructor (view: EditorView) {
+          this.scheduleProcess(view)
+        }
 
-      processImages (view: EditorView) {
-        if (!plugin.settings.renderInEditMode) return
+        processImages (view: EditorView) {
+          const images = view.dom.querySelectorAll('.image-embed img:not(.immich-remote-image)')
 
-        const images = view.dom.querySelectorAll('img:not(.immich-remote-image)')
-
-        for (const img of Array.from(images)) {
-          // Skip images in the actively-edited line/block (let Obsidian handle toggle)
-          const parentLine = img.closest('.cm-line, .cm-embed-block')
-          if (parentLine?.classList.contains('cm-active')) continue
-          if (parentLine?.querySelector('.cm-active')) continue
-
-          const src = img.getAttribute('src') || ''
-
-          if (src.includes('/api/assets/') && src.includes('/thumbnail')) {
-            const urlMatch = src.match(/\/api\/assets\/([a-f0-9-]+)\/thumbnail/i)
-            if (urlMatch) {
-              void replaceImgSrc(plugin, img as HTMLImageElement, urlMatch[1])
-              this.addEditButton(view, img as HTMLImageElement, urlMatch[1])
-              // Hide Obsidian's native edit-block button
-              const embedBlock = img.closest('.cm-embed-block')
-              const nativeBtn = embedBlock?.querySelector('.edit-block-button')
-              if (nativeBtn) nativeBtn.classList.add('immich-hide-native-edit')
+          for (const img of Array.from(images)) {
+            const src = img.getAttribute('src') || ''
+            if (src.includes('/api/assets/') && src.includes('/thumbnail')) {
+              const urlMatch = src.match(/\/api\/assets\/([a-f0-9-]+)\/thumbnail/i)
+              if (urlMatch) {
+                void replaceImgSrc(plugin, img as HTMLImageElement, urlMatch[1])
+              }
             }
           }
         }
-      }
 
-      addEditButton (view: EditorView, img: HTMLImageElement, assetId?: string) {
-        // Don't add if already exists nearby
-        if (img.nextElementSibling?.classList.contains('immich-edit-btn')) return
-        if (img.parentElement?.querySelector('.immich-edit-btn')) return
-
-        // Wrap img in a positioned container if not already wrapped
-        let wrapper = img.parentElement
-        if (!wrapper?.classList.contains('immich-img-wrapper')) {
-          wrapper = document.createElement('span')
-          wrapper.className = 'immich-img-wrapper'
-          img.parentElement?.insertBefore(wrapper, img)
-          wrapper.appendChild(img)
+        scheduleProcess (view: EditorView) {
+          if (this.debounceTimer) window.clearTimeout(this.debounceTimer)
+          this.debounceTimer = window.setTimeout(() => {
+            this.processImages(view)
+          }, 200)
         }
 
-        const btn = document.createElement('button')
-        btn.className = 'immich-edit-btn'
-        btn.innerHTML = '&#x270E;' // ✎ pencil
-        btn.title = 'Edit source'
-        btn.addEventListener('click', e => {
-          e.stopPropagation()
-          e.preventDefault()
-
-          // eslint-disable-next-line obsidianmd/ui/sentence-case
-          new Notice('[Debug] Pencil clicked', 3000)
-
-          // Step 1: Place cursor on the image line
-          const doc = view.state.doc
-          const searchTerm = assetId || '/api/assets/'
-          let found = false
-          for (let i = 1; i <= doc.lines; i++) {
-            const line = doc.line(i)
-            if (line.text.includes(searchTerm)) {
-              // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice(`[Debug] Found line ${i}: ${line.text.substring(0, 40)}...`, 5000)
-              view.dispatch({ selection: { anchor: line.from + 1 } })
-              view.focus()
-              found = true
-              break
-            }
-          }
-          if (!found) {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice(`[Debug] Asset not found in doc: ${searchTerm}`, 5000)
-          }
-
-          // Step 2: After a tick, find and click the native edit-block button
-          setTimeout(() => {
-            const embedBlock = img.closest('.cm-embed-block')
-            const nativeBtn = embedBlock?.querySelector('.edit-block-button') as HTMLElement | null
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice(`[Debug] embedBlock: ${embedBlock ? 'found' : 'null'}, nativeBtn: ${nativeBtn ? 'found' : 'null'}`, 5000)
-            if (nativeBtn) {
-              nativeBtn.classList.remove('immich-hide-native-edit')
-              nativeBtn.click()
-              // eslint-disable-next-line obsidianmd/ui/sentence-case
-              new Notice('[Debug] Clicked native button', 3000)
-            }
-          }, 100)
-        })
-        wrapper.appendChild(btn)
-      }
-
-      scheduleProcess (view: EditorView) {
-        if (this.debounceTimer) window.clearTimeout(this.debounceTimer)
-        this.debounceTimer = window.setTimeout(() => {
-          this.processImages(view)
-        }, 150)
-      }
-
-      update (update: ViewUpdate) {
-        if (update.docChanged || update.viewportChanged || update.selectionSet) {
-          this.scheduleProcess(update.view)
-        }
-        // Continuously hide native edit buttons on our images (Obsidian re-creates them)
-        const nativeBtns = update.view.dom.querySelectorAll('.cm-embed-block .edit-block-button')
-        for (const btn of Array.from(nativeBtns)) {
-          const block = btn.closest('.cm-embed-block')
-          if (block?.querySelector('.immich-remote-image')) {
-            (btn as HTMLElement).classList.add('immich-hide-native-edit')
+        update (update: ViewUpdate) {
+          if (update.docChanged || update.viewportChanged || update.selectionSet) {
+            this.scheduleProcess(update.view)
           }
         }
-      }
 
-      destroy () {
-        if (this.debounceTimer) window.clearTimeout(this.debounceTimer)
+        destroy () {
+          if (this.debounceTimer) window.clearTimeout(this.debounceTimer)
+        }
       }
-    }
-  )
+    )
 
-  plugin.registerEditorExtension(immichEditorPlugin)
+    plugin.registerEditorExtension(livePreviewPlugin)
+  }
 }
+
+// --- Helpers ---
 
 async function replaceImgSrc (plugin: ImmichPicker, img: HTMLImageElement, assetId: string): Promise<void> {
   try {
@@ -245,17 +161,14 @@ function renderImmichImage (plugin: ImmichPicker, el: HTMLElement, assetId: stri
 }
 
 async function fetchOrGetCached (plugin: ImmichPicker, assetId: string): Promise<string> {
-  // Check cache first
   if (blobCache.has(assetId)) {
     return blobCache.get(assetId)!
   }
 
-  // Check if already fetching
   if (pendingFetches.has(assetId)) {
     return pendingFetches.get(assetId)!
   }
 
-  // Fetch and cache
   const fetchPromise = (async () => {
     const url = plugin.immichApi.getThumbnailUrl(assetId)
     const apiKey = await plugin.getApiKey()

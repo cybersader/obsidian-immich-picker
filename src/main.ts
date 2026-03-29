@@ -44,6 +44,63 @@ export default class ImmichPicker extends Plugin {
     // Always register post-processor so remote images render in any mode
     registerImmichPostProcessor(this)
 
+    // Context menu: right-click on Immich images in Live Preview
+    this.registerEvent(
+      this.app.workspace.on('editor-menu', (menu, editor, view) => {
+        // Check if the note contains Immich images
+        const content = editor.getValue()
+        const assetMatch = content.match(/\/api\/assets\/([a-f0-9-]+)\/thumbnail/i)
+        if (!assetMatch) return
+        const assetId = assetMatch[1]
+
+        // Find the line containing this image
+        let imageLine = -1
+        const lines = content.split('\n')
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].includes(assetId)) {
+            imageLine = i
+            break
+          }
+        }
+
+        menu.addItem(item => {
+          item.setTitle('Edit image source')
+          item.setIcon('pencil')
+          item.onClick(() => {
+            // Switch to source mode and position cursor
+            const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView)
+            if (!markdownView) return
+            const state = markdownView.getState()
+            state.source = true
+            void markdownView.setState(state, { history: false }).then(() => {
+              if (imageLine >= 0) {
+                editor.setCursor({ line: imageLine, ch: 0 })
+                editor.focus()
+              }
+            })
+          })
+        })
+
+        menu.addItem(item => {
+          item.setTitle('Open in Immich')
+          item.setIcon('external-link')
+          item.onClick(() => {
+            window.open(this.immichApi.getAssetUrl(assetId), '_blank')
+          })
+        })
+
+        menu.addItem(item => {
+          item.setTitle('Delete image')
+          item.setIcon('trash')
+          item.onClick(() => {
+            if (imageLine >= 0) {
+              editor.replaceRange('', { line: imageLine, ch: 0 }, { line: imageLine + 1, ch: 0 })
+            }
+          })
+        })
+      })
+    )
+
     // Ribbon icon — accessible from hamburger menu on mobile
     this.addRibbonIcon('image-plus', 'Insert image from Immich', () => {
       if (!this.settings.serverUrl || !this.cachedApiKey) {
